@@ -8,7 +8,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { ClipboardCopy, ClipboardCheck, TerminalSquare, Settings2, Edit3, PlusSquare } from 'lucide-react';
+import { Checkbox } from "@/components/ui/checkbox";
+import { ClipboardCopy, ClipboardCheck, TerminalSquare, Settings2, Edit3, PlusSquare, ListPlus } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 
 type OperationType = 'rename' | 'create';
@@ -22,6 +23,8 @@ export default function PaloAltoForm() {
   const [generatedCommands, setGeneratedCommands] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isCopied, setIsCopied] = useState<boolean>(false);
+  const [addToGroup, setAddToGroup] = useState<boolean>(false);
+  const [addressGroupSuffix, setAddressGroupSuffix] = useState<string>('');
   const { toast } = useToast();
 
   const handleGenerateCommands = (event: FormEvent) => {
@@ -38,7 +41,6 @@ export default function PaloAltoForm() {
         setIsLoading(false);
         return;
     }
-    // Tag is no longer mandatory here, will use baseName if tag is empty.
     if (!objectListInput.trim()) {
         toast({
             title: "Missing Object List/Values",
@@ -51,14 +53,15 @@ export default function PaloAltoForm() {
 
     const lines = objectListInput.split('\n');
     const commandsArray: string[] = [];
-    const effectiveTag = tag.trim() || baseName.trim(); // Use baseName if tag is empty
+    const objectNamesForGroup: string[] = [];
+    const effectiveTag = tag.trim() || baseName.trim(); 
 
     lines.forEach(line => {
       const trimmedLine = line.trim();
       if (!trimmedLine) return;
 
       let valuePartForNewNameConstruction: string;
-      let valuePartForObjectDefinition: string; // Only for 'create'
+      let valuePartForObjectDefinition: string; 
       let descriptionForNewObject: string;
       let originalObjectNameForRename: string | undefined = undefined;
 
@@ -76,10 +79,10 @@ export default function PaloAltoForm() {
           commandsArray.push(`# Skipping RENAME: Malformed entry (empty suffix part after underscore): ${trimmedLine}`);
           return;
         }
-      } else { // operationType === 'create'
+      } else { 
         valuePartForNewNameConstruction = trimmedLine;
         valuePartForObjectDefinition = trimmedLine; 
-        descriptionForNewObject = trimmedLine; // Use the input value as description
+        descriptionForNewObject = trimmedLine; 
 
         if (!valuePartForObjectDefinition.trim()) {
              commandsArray.push(`# Skipping CREATE: Empty value provided: ${trimmedLine}`);
@@ -87,15 +90,16 @@ export default function PaloAltoForm() {
         }
       }
       
-      const sanitizedValuePart = valuePartForNewNameConstruction.replace(/\./g, '_').replace(/\//g, '_').replace(/-/g, '_');
+      const sanitizedValuePart = valuePartForNewNameConstruction.replace(/[.\/\s-]+/g, '_');
       const newName = `${baseName.trim()}_${objectType}_${sanitizedValuePart}`;
       
       if (operationType === 'rename') {
-        if (!originalObjectNameForRename) return; // Should be caught by earlier checks
+        if (!originalObjectNameForRename) return; 
         commandsArray.push(`rename address ${originalObjectNameForRename} to ${newName}`);
         commandsArray.push(`set address ${newName} description "${descriptionForNewObject}"`);
         commandsArray.push(`set address ${newName} tag [ ${effectiveTag} ]\n`);
-      } else { // operationType === 'create'
+        objectNamesForGroup.push(newName);
+      } else { 
         switch (objectType) {
           case 'HST':
             const hostIp = valuePartForObjectDefinition.includes('/') ? valuePartForObjectDefinition : `${valuePartForObjectDefinition}/32`;
@@ -113,15 +117,24 @@ export default function PaloAltoForm() {
         }
         commandsArray.push(`set address ${newName} description "${descriptionForNewObject}"`);
         commandsArray.push(`set address ${newName} tag [ ${effectiveTag} ]\n`);
+        objectNamesForGroup.push(newName);
       }
     });
+
+    if (addToGroup && objectNamesForGroup.length > 0) {
+      const sanitizedGroupSuffix = addressGroupSuffix.trim().replace(/[.\/\-\s]+/g, '_');
+      const groupName = `${baseName.trim()}_ADG_${sanitizedGroupSuffix}`;
+      commandsArray.push(`\n# Address Group Configuration`);
+      commandsArray.push(`set address-group ${groupName} static [ ${objectNamesForGroup.join(' ')} ]`);
+      commandsArray.push(''); 
+    }
 
     setGeneratedCommands(commandsArray.join('\n'));
     setIsLoading(false);
     if (commandsArray.length > 0 && commandsArray.some(cmd => !cmd.startsWith('#'))) {
         toast({
             title: "Commands Generated",
-            description: "Your Palo Alto CLI commands are ready.",
+            description: `Your Palo Alto CLI commands are ready.${addToGroup && objectNamesForGroup.length > 0 ? ' Address group configured.' : ''}`,
         });
     } else if (commandsArray.every(cmd => cmd.startsWith('#')) && commandsArray.length > 0) {
         toast({
@@ -169,30 +182,25 @@ export default function PaloAltoForm() {
 `# Examples (OriginalObjectName_SuffixForNewName):
 # MyServer_192.168.1.10
 # CorpNet_10.10.0.0/16
-# DMZServers_172.16.1.5-172.16.1.20
-# GoogleDNS_google.com
 #
 # Paste one entry per line.
 # The SuffixForNewName part is used to construct the new object name.
 
 ProdServer_1.1.1.1
-StagingNet_10.20.0.0/24
-GuestRange_192.168.100.10-192.168.100.20
-MainSite_main.example.com`;
+StagingNet_10.20.0.0/24`;
 
   const createPlaceholder =
 `# Examples (one actual value per line):
-# 192.168.1.10
-# 10.10.0.0/16
-# 172.16.1.5-172.16.1.20
-# google.com
+# 192.168.1.10 (for Host)
+# 10.10.0.0/16 (for Subnet)
+# 172.16.1.5-172.16.1.20 (for Address Range)
+# google.com (for FQDN)
 #
 # Paste one value per line.
 # This value will be used for the object and its description.
 
 1.1.1.1
 10.20.0.0/24
-192.168.100.10-192.168.100.20
 main.example.com`;
 
   return (
@@ -284,6 +292,40 @@ main.example.com`;
           </div>
           
           <div className="space-y-2">
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="addToGroup"
+                checked={addToGroup}
+                onCheckedChange={(checked: boolean | 'indeterminate') => setAddToGroup(checked === true)}
+              />
+              <Label htmlFor="addToGroup" className="font-semibold text-card-foreground/90 flex items-center">
+                <ListPlus className="mr-2 h-5 w-5 text-primary/80" />
+                Add objects to an Address Group
+              </Label>
+            </div>
+          </div>
+
+          {addToGroup && (
+            <div className="space-y-2 pl-7"> {/* Aligned with checkbox text */}
+              <Label htmlFor="addressGroupSuffix" className="font-semibold text-card-foreground/90">
+                Address Group Name Suffix (Optional)
+              </Label>
+              <Input
+                id="addressGroupSuffix"
+                type="text"
+                placeholder="e.g., WebServers"
+                value={addressGroupSuffix}
+                onChange={(e) => setAddressGroupSuffix(e.target.value)}
+                className="focus:ring-ring"
+              />
+              <p className="text-xs text-muted-foreground">
+                Group name: {(baseName.trim() || "BaseName")}_ADG_{addressGroupSuffix.trim().replace(/[.\\/\\-\\s]+/g, '_') || (addressGroupSuffix.trim() ? "" : "")}
+                {!(addressGroupSuffix.trim()) && <span className="italic">(no suffix)</span>}
+              </p>
+            </div>
+          )}
+
+          <div className="space-y-2">
             <Label htmlFor="objectList" className="font-semibold text-card-foreground/90">
               {operationType === 'rename' ? 'Object List (OriginalObjectName_SuffixForNewName)' : 'Object Values (One value per line)'}
             </Label>
@@ -298,10 +340,10 @@ main.example.com`;
             />
             <p className="text-xs text-muted-foreground">
               {operationType === 'rename' 
-                ? "Format: `OriginalObjectName_SuffixForNewName` (e.g., OldServer_1.2.3.4). Suffix is used for new name."
-                : "Format: Actual Value (e.g., 1.2.3.4, 10.0.0.0/16, example.com). Paste one value per line."
+                ? "Format: `OriginalName_SuffixForNewName`. Suffix is used for new object name."
+                : "Format: Actual Value (e.g., 1.2.3.4 for Host, 10.0.0.0/16 for Subnet)."
               }
-              {' '}Value type depends on selected Object Type.
+              {' '}Value type depends on selected Object Type. Paste one entry per line.
             </p>
           </div>
         </CardContent>
@@ -358,3 +400,4 @@ main.example.com`;
     </Card>
   );
 }
+
