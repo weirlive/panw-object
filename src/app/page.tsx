@@ -1,3 +1,19 @@
+import PaloAltoForm from '@/components/palo-alto-form';
+
 export default function Home() {
-  return <></>;
+  return (
+    <main className="min-h-screen bg-background flex flex-col items-center justify-center p-4 sm:p-8 font-body">
+      <div className="w-full max-w-2xl">
+        <header className="text-center mb-8">
+          <h1 className="font-headline text-4xl sm:text-5xl font-bold text-primary">
+            Palo Alto Command Generator
+          </h1>
+          <p className="text-muted-foreground mt-2 text-lg">
+            Easily generate Palo Alto CLI commands for renaming and tagging address objects.
+          </p>
+        </header>
+        <PaloAltoForm />
+      </div>
+    </main>
+  );
 }
