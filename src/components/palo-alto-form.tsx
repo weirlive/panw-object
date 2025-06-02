@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { ClipboardCopy, ClipboardCheck, TerminalSquare, Settings2, Edit3, PlusSquare, ListPlus } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 
@@ -250,24 +251,22 @@ main.example.com`;
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
               <Label className="font-semibold text-card-foreground/90">Type</Label>
-              <RadioGroup
-                value={operationType}
-                onValueChange={(value) => setOperationType(value as OperationType)}
-                className="flex flex-col space-y-2 pt-1"
-              >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="rename" id="op-rename" />
-                  <Label htmlFor="op-rename" className="font-normal flex items-center">
-                    <Edit3 className="mr-2 h-4 w-4 text-primary/80" /> Rename
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="create" id="op-create" />
-                  <Label htmlFor="op-create" className="font-normal flex items-center">
-                    <PlusSquare className="mr-2 h-4 w-4 text-primary/80" /> Create
-                  </Label>
-                </div>
-              </RadioGroup>
+              <div className="flex items-center space-x-2 pt-1">
+                <Label htmlFor="operation-switch" className="font-normal flex items-center cursor-pointer">
+                  <Edit3 className="mr-2 h-4 w-4 text-primary/80" /> Rename
+                </Label>
+                <Switch
+                  id="operation-switch"
+                  checked={operationType === 'create'}
+                  onCheckedChange={(checked) => {
+                    setOperationType(checked ? 'create' : 'rename');
+                  }}
+                  aria-label={`Switch to ${operationType === 'create' ? 'Rename' : 'Create'} mode`}
+                />
+                <Label htmlFor="operation-switch" className="font-normal flex items-center cursor-pointer">
+                  <PlusSquare className="mr-2 h-4 w-4 text-primary/80" /> Create
+                </Label>
+              </div>
             </div>
             <div className="space-y-2">
               <Label className="font-semibold text-card-foreground/90">Object Type</Label>
@@ -404,4 +403,3 @@ main.example.com`;
     </Card>
   );
 }
-
