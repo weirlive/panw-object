@@ -18,7 +18,7 @@ export default function PaloAltoForm() {
   const [baseName, setBaseName] = useState<string>('');
   const [tag, setTag] = useState<string>('');
   const [objectType, setObjectType] = useState<string>('HST');
-  const [operationType, setOperationType] = useState<OperationType>('rename');
+  const [operationType, setOperationType] = useState<OperationType>('create');
   const [objectListInput, setObjectListInput] = useState<string>('');
   const [generatedCommands, setGeneratedCommands] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -255,14 +255,14 @@ main.example.com`;
                   <SelectValue placeholder="Select operation type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="rename">
-                    <div className="flex items-center">
-                      <Edit3 className="mr-2 h-4 w-4 text-primary/80" /> Rename
-                    </div>
-                  </SelectItem>
                   <SelectItem value="create">
                      <div className="flex items-center">
                       <PlusSquare className="mr-2 h-4 w-4 text-primary/80" /> Create
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="rename">
+                    <div className="flex items-center">
+                      <Edit3 className="mr-2 h-4 w-4 text-primary/80" /> Rename
                     </div>
                   </SelectItem>
                 </SelectContent>
