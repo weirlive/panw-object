@@ -2,55 +2,51 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  font-family: Arial, Helvetica, sans-serif;
-}
-
 @layer base {
   :root {
-    --background: 224 71% 4%; /* Very dark blue, almost black */
-    --foreground: 210 20% 98%; /* Off-white */
+    --background: 0 0% 100%; /* White */
+    --foreground: 270 40% 15%; /* Very Dark Purple/Almost Black */
 
-    --card: 224 71% 9%; /* Slightly lighter dark blue for cards */
-    --card-foreground: 210 20% 98%;
+    --card: 270 20% 97%; /* Very Light Purple-tinted Off-White */
+    --card-foreground: 270 40% 15%;
 
-    --popover: 224 71% 9%;
-    --popover-foreground: 210 20% 98%;
+    --popover: 270 20% 97%;
+    --popover-foreground: 270 40% 15%;
 
-    --primary: 263 70% 55%; /* Vibrant Purple */
-    --primary-foreground: 210 20% 98%; /* Off-white, for contrast on purple */
+    --primary: 260 70% 55%; /* Vibrant Purple */
+    --primary-foreground: 0 0% 100%; /* White */
 
-    --secondary: 263 60% 30%;  /* Darker Purple */
-    --secondary-foreground: 210 20% 90%;
+    --secondary: 260 60% 80%;  /* Lighter Purple */
+    --secondary-foreground: 270 40% 15%; /* Very Dark Purple for text on Lighter Purple */
 
-    --muted: 223 47% 11%; /* Muted Dark Blue */
-    --muted-foreground: 210 20% 60%;  /* Muted Light Grey */
+    --muted: 270 20% 94%; /* Lightest Purple-Grey */
+    --muted-foreground: 270 15% 55%;  /* Medium Greyish Purple */
 
-    --accent: 300 75% 60%;    /* Bright Pink/Magenta */
-    --accent-foreground: 210 20% 98%; /* Off-white, for contrast on accent */
+    --accent: 280 75% 60%;    /* Magenta-Purple */
+    --accent-foreground: 0 0% 100%; /* White */
 
-    --destructive: 0 72% 51%;   /* Red */
-    --destructive-foreground: 210 20% 98%;
+    --destructive: 0 84.2% 60.2%;   /* Red */
+    --destructive-foreground: 0 0% 100%; /* White */
 
-    --border: 263 50% 25%;      /* Dark Purple Border */
-    --input: 263 50% 18%;       /* Dark Purple Input BG */
-    --ring: 300 75% 65%;       /* Accent color for ring */
+    --border: 270 20% 88%;      /* Light Purple-Grey Border */
+    --input: 270 20% 96%;       /* Very Light Purple-Grey Input BG */
+    --ring: 260 70% 65%;       /* Purple for ring */
     
-    --chart-1: 263 70% 65%; /* Lighter Purple */
-    --chart-2: 280 65% 60%; /* Indigo-Purple */
-    --chart-3: 300 70% 55%; /* Pinkish-Purple */
+    --chart-1: 260 70% 65%; /* Lighter Purple */
+    --chart-2: 270 65% 60%; /* Indigo-Purple */
+    --chart-3: 280 70% 55%; /* Pinkish-Purple */
     --chart-4: 250 75% 70%; /* Bluish-Purple */
-    --chart-5: 320 70% 65%; /* Magenta */
+    --chart-5: 290 70% 65%; /* Magenta */
     --radius: 0.5rem;
 
-    --sidebar-background: 224 71% 6%; /* Slightly different dark for sidebar */
-    --sidebar-foreground: 210 20% 90%;
-    --sidebar-primary: 263 70% 55%; /* Purple */
-    --sidebar-primary-foreground: 210 20% 98%;
-    --sidebar-accent: 263 50% 35%; /* Darker Purple for accent */
-    --sidebar-accent-foreground: 210 20% 95%;
-    --sidebar-border: 263 40% 20%;
-    --sidebar-ring: 300 75% 65%;
+    --sidebar-background: 270 30% 98%; /* Almost white with a hint of purple */
+    --sidebar-foreground: 270 40% 15%;
+    --sidebar-primary: 260 70% 50%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 280 75% 60%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 270 20% 90%;
+    --sidebar-ring: 280 75% 65%;
   }
 
   .dark {
