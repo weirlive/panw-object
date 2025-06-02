@@ -68,7 +68,7 @@ export default function PaloAltoForm() {
       if (operationType === 'rename') {
         const lastUnderscoreIndex = trimmedLine.lastIndexOf('_');
         if (lastUnderscoreIndex === -1) {
-          commandsArray.push(`# Skipping RENAME: Malformed entry (expected OriginalName_SuffixForNewName): ${trimmedLine}`);
+          commandsArray.push(`# Skipping RENAME: Malformed entry (expected OriginalObjectName_SuffixForNewName): ${trimmedLine}`);
           return;
         }
         originalObjectNameForRename = trimmedLine;
@@ -123,9 +123,14 @@ export default function PaloAltoForm() {
 
     if (addToGroup && objectNamesForGroup.length > 0) {
       const sanitizedGroupSuffix = addressGroupSuffix.trim().replace(/[.\/\-\s]+/g, '_');
-      const groupName = `${baseName.trim()}_ADG_${sanitizedGroupSuffix}`;
+      const groupName = `${baseName.trim()}_ADG_${sanitizedGroupSuffix || ''}`;
       commandsArray.push(`\n# Address Group Configuration`);
       commandsArray.push(`set address-group ${groupName} static [ ${objectNamesForGroup.join(' ')} ]`);
+      if (!addressGroupSuffix.trim()) {
+        commandsArray.push(`set address-group ${groupName} description "Address group for ${baseName.trim()}"`);
+      } else {
+        commandsArray.push(`set address-group ${groupName} description "${addressGroupSuffix.trim()}"`);
+      }
       commandsArray.push(''); 
     }
 
@@ -248,7 +253,7 @@ main.example.com`;
               <RadioGroup
                 value={operationType}
                 onValueChange={(value) => setOperationType(value as OperationType)}
-                className="flex flex-col space-y-2 pt-1 sm:flex-row sm:flex-wrap sm:space-y-0 sm:space-x-4"
+                className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2"
               >
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="rename" id="op-rename" />
@@ -306,21 +311,20 @@ main.example.com`;
           </div>
 
           {addToGroup && (
-            <div className="space-y-2 pl-7"> {/* Aligned with checkbox text */}
+            <div className="space-y-2 pl-7"> 
               <Label htmlFor="addressGroupSuffix" className="font-semibold text-card-foreground/90">
                 Address Group Name Suffix (Optional)
               </Label>
               <Input
                 id="addressGroupSuffix"
                 type="text"
-                placeholder="e.g., WebServers"
+                placeholder="e.g., WebServers (ZoneName_ADG_WebServers)"
                 value={addressGroupSuffix}
                 onChange={(e) => setAddressGroupSuffix(e.target.value)}
                 className="focus:ring-ring"
               />
               <p className="text-xs text-muted-foreground">
-                Group name: {(baseName.trim() || "ZoneName")}_ADG_{addressGroupSuffix.trim().replace(/[.\\/\\-\\s]+/g, '_') || (addressGroupSuffix.trim() ? "" : "")}
-                {!(addressGroupSuffix.trim()) && <span className="italic">(no suffix)</span>}
+                Final group name: {baseName.trim() || "[ZoneName]"}_ADG_{addressGroupSuffix.trim().replace(/[.\/\-\s]+/g, '_') || <span className="italic">(no suffix)</span>}
               </p>
             </div>
           )}
