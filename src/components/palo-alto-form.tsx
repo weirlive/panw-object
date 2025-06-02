@@ -249,22 +249,22 @@ main.example.com`;
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
-              <Label className="font-semibold text-card-foreground/90">Operation Type</Label>
+              <Label className="font-semibold text-card-foreground/90">Type</Label>
               <RadioGroup
                 value={operationType}
                 onValueChange={(value) => setOperationType(value as OperationType)}
-                className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2"
+                className="flex flex-col space-y-2 pt-1"
               >
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="rename" id="op-rename" />
                   <Label htmlFor="op-rename" className="font-normal flex items-center">
-                    <Edit3 className="mr-2 h-4 w-4 text-primary/80" /> Rename Existing
+                    <Edit3 className="mr-2 h-4 w-4 text-primary/80" /> Rename
                   </Label>
                 </div>
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="create" id="op-create" />
                   <Label htmlFor="op-create" className="font-normal flex items-center">
-                    <PlusSquare className="mr-2 h-4 w-4 text-primary/80" /> Create New
+                    <PlusSquare className="mr-2 h-4 w-4 text-primary/80" /> Create
                   </Label>
                 </div>
               </RadioGroup>
