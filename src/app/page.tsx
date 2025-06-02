@@ -6,7 +6,7 @@ export default function Home() {
       <div className="w-full max-w-2xl">
         <header className="text-center mb-8">
           <h1 className="font-headline text-4xl sm:text-5xl font-bold text-primary">
-            PANW Object Tool v28901
+            PANW OBJECT TOOL
           </h1>
           <p className="text-muted-foreground mt-2 text-lg">
             Easily generate Palo Alto CLI commands for renaming and tagging address objects.
@@ -14,6 +14,11 @@ export default function Home() {
         </header>
         <PaloAltoForm />
       </div>
+      <footer className="mt-12 text-center">
+        <p className="text-sm text-muted-foreground">
+          Powered by Naming Scheme 28901
+        </p>
+      </footer>
     </main>
   );
 }

@@ -3,7 +3,7 @@ import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 
 export const metadata: Metadata = {
-  title: 'PANW Object Tool v28901',
+  title: 'PANW OBJECT TOOL',
   description: 'Generate Palo Alto CLI commands for renaming and tagging address objects.',
 };
 
