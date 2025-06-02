@@ -62,27 +62,36 @@ export default function PaloAltoForm() {
 
       let valuePartForNewNameConstruction: string;
       let valuePartForObjectDefinition: string;
-      let descriptionForNewObject: string;
+      let descriptionForNewObject = trimmedLine; // Use the full input line as description
       let originalObjectNameForRename: string | undefined = undefined;
 
       if (operationType === 'rename') {
-        const lastUnderscoreIndex = trimmedLine.lastIndexOf('_');
-        if (lastUnderscoreIndex === -1) {
-          commandsArray.push(`# Skipping RENAME: Malformed entry (expected OriginalObjectName_SuffixForNewName): ${trimmedLine}`);
-          return;
-        }
-        originalObjectNameForRename = trimmedLine;
-        valuePartForNewNameConstruction = trimmedLine.substring(lastUnderscoreIndex + 1);
-        descriptionForNewObject = originalObjectNameForRename;
+        if (objectType === 'FQDN') {
+          // For FQDN rename, the trimmedLine is the original FQDN name and also the base for the new name suffix.
+          originalObjectNameForRename = trimmedLine;
+          valuePartForNewNameConstruction = trimmedLine;
+        } else {
+          // For other types, expect OriginalObjectName_SuffixForNewName
+          const lastUnderscoreIndex = trimmedLine.lastIndexOf('_');
+          if (lastUnderscoreIndex === -1 || lastUnderscoreIndex === 0 || lastUnderscoreIndex === trimmedLine.length - 1) {
+            commandsArray.push(`# Skipping RENAME: Malformed entry for ${objectType}. Expected OriginalObjectName_SuffixForNewName (with content on both sides of '_'): ${trimmedLine}`);
+            return;
+          }
+          originalObjectNameForRename = trimmedLine.substring(0, lastUnderscoreIndex);
+          valuePartForNewNameConstruction = trimmedLine.substring(lastUnderscoreIndex + 1);
 
-        if (!valuePartForNewNameConstruction) {
-          commandsArray.push(`# Skipping RENAME: Malformed entry (empty suffix part after underscore): ${trimmedLine}`);
-          return;
+          if (!valuePartForNewNameConstruction.trim()) {
+            commandsArray.push(`# Skipping RENAME: Malformed entry for ${objectType} (empty suffix part after underscore): ${trimmedLine}`);
+            return;
+          }
+           if (!originalObjectNameForRename.trim()) {
+             commandsArray.push(`# Skipping RENAME: Malformed entry for ${objectType} (empty original name part before underscore): ${trimmedLine}`);
+             return;
+          }
         }
       } else { // operationType === 'create'
         valuePartForNewNameConstruction = trimmedLine;
         valuePartForObjectDefinition = trimmedLine;
-        descriptionForNewObject = trimmedLine;
 
         if (!valuePartForObjectDefinition.trim()) {
              commandsArray.push(`# Skipping CREATE: Empty value provided: ${trimmedLine}`);
@@ -104,8 +113,12 @@ export default function PaloAltoForm() {
         }
         newName = `${baseName.trim()}_${objectType}_${formattedValuePart}`;
       } else { // operationType === 'rename'
-        // For rename, the suffix part is sanitized to replace dots as well
-        const sanitizedSuffixForRename = valuePartForNewNameConstruction.replace(/[.\/\s-]+/g, '_');
+        // For rename, the suffix part is sanitized to replace dots as well (among other characters)
+        const sanitizedSuffixForRename = valuePartForNewNameConstruction
+            .replace(/[.\/\s-]+/g, '_') // Replace dots, slashes, spaces, hyphens with underscores
+            .replace(/_{2,}/g, '_')    // Collapse multiple underscores
+            .replace(/^_+|_+$/g, '');  // Trim leading/trailing underscores
+
          if (!sanitizedSuffixForRename) {
           commandsArray.push(`# Skipping RENAME: Resulting name suffix is empty after sanitization: ${trimmedLine} (using suffix: ${valuePartForNewNameConstruction})`);
           return;
@@ -115,7 +128,10 @@ export default function PaloAltoForm() {
 
 
       if (operationType === 'rename') {
-        if (!originalObjectNameForRename) return; // Should not happen due to earlier checks
+        if (!originalObjectNameForRename) {
+             commandsArray.push(`# Skipping RENAME: Could not determine original object name for: ${trimmedLine}`);
+             return;
+        }
         commandsArray.push(`rename address ${originalObjectNameForRename} to ${newName}`);
         commandsArray.push(`set address ${newName} description "${descriptionForNewObject}"`);
         commandsArray.push(`set address ${newName} tag [ ${effectiveTag} ]\n`);
@@ -204,7 +220,7 @@ export default function PaloAltoForm() {
     }
   };
 
-  const renamePlaceholder =
+  const renamePlaceholderBase =
 `# Examples (OriginalObjectName_SuffixForNewName):
 # MyServer_192.168.1.10
 # CorpNet_10.10.0.0/16
@@ -214,6 +230,19 @@ export default function PaloAltoForm() {
 
 ProdServer_1.1.1.1
 StagingNet_10.20.0.0/24`;
+
+const fqdnRenamePlaceholder =
+`# Examples (Original FQDN, one per line):
+# old.example.com
+# internal.service.local
+#
+# Paste one FQDN per line.
+# This FQDN will be the original object name, and also used
+# to construct the suffix of the new object name.
+
+server.mycompany.com
+app.internal.net`;
+
 
   const createPlaceholder =
 `# Examples (one actual value per line):
@@ -228,6 +257,13 @@ StagingNet_10.20.0.0/24`;
 1.1.1.1
 10.20.0.0/24
 main.example.com`;
+
+  const getPlaceholder = () => {
+    if (operationType === 'rename') {
+      return objectType === 'FQDN' ? fqdnRenamePlaceholder : renamePlaceholderBase;
+    }
+    return createPlaceholder;
+  }
 
   return (
     <Card className="w-full shadow-xl bg-card text-card-foreground">
@@ -340,11 +376,16 @@ main.example.com`;
 
           <div className="space-y-2">
             <Label htmlFor="objectList" className="font-semibold text-card-foreground/90">
-              {operationType === 'rename' ? 'Object List (OriginalObjectName_SuffixForNewName)' : 'Object Values (One value per line)'}
+              {operationType === 'rename'
+                ? objectType === 'FQDN'
+                  ? 'Object List (Original FQDN, one per line)'
+                  : 'Object List (OriginalObjectName_SuffixForNewName)'
+                : 'Object Values (One value per line)'
+              }
             </Label>
             <Textarea
               id="objectList"
-              placeholder={operationType === 'rename' ? renamePlaceholder : createPlaceholder}
+              placeholder={getPlaceholder()}
               value={objectListInput}
               onChange={(e) => setObjectListInput(e.target.value)}
               required
@@ -353,7 +394,10 @@ main.example.com`;
             />
             <p className="text-xs text-muted-foreground">
               {operationType === 'rename'
-                ? "Format: `OriginalName_SuffixForNewName`. Suffix is used for new object name."
+                ? (objectType === 'FQDN'
+                    ? "Format: `OriginalFQDN`. This FQDN will be used as the original name and as the base for the new object name suffix."
+                    : "Format: `OriginalName_SuffixForNewName`. Suffix is used for new object name."
+                  )
                 : "Format: Actual Value (e.g., 1.2.3.4 for Host, 10.0.0.0/16 for Subnet)."
               }
               {' '}Value type depends on selected Object Type. Paste one entry per line.
