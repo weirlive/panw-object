@@ -62,16 +62,14 @@ export default function PaloAltoForm() {
 
       let valuePartForNewNameConstruction: string;
       let valuePartForObjectDefinition: string;
-      let descriptionForNewObject = trimmedLine; // Use the full input line as description
+      let descriptionForNewObject = trimmedLine; 
       let originalObjectNameForRename: string | undefined = undefined;
 
       if (operationType === 'rename') {
         if (objectType === 'FQDN') {
-          // For FQDN rename, the trimmedLine is the original FQDN name and also the base for the new name suffix.
           originalObjectNameForRename = trimmedLine;
           valuePartForNewNameConstruction = trimmedLine;
         } else {
-          // For other types, expect OriginalObjectName_SuffixForNewName
           const lastUnderscoreIndex = trimmedLine.lastIndexOf('_');
           if (lastUnderscoreIndex === -1 || lastUnderscoreIndex === 0 || lastUnderscoreIndex === trimmedLine.length - 1) {
             commandsArray.push(`# Skipping RENAME: Malformed entry for ${objectType}. Expected OriginalObjectName_SuffixForNewName (with content on both sides of '_'): ${trimmedLine}`);
@@ -89,7 +87,7 @@ export default function PaloAltoForm() {
              return;
           }
         }
-      } else { // operationType === 'create'
+      } else { 
         valuePartForNewNameConstruction = trimmedLine;
         valuePartForObjectDefinition = trimmedLine;
 
@@ -103,27 +101,26 @@ export default function PaloAltoForm() {
 
       if (operationType === 'create') {
         let formattedValuePart = valuePartForNewNameConstruction
-          .replace(/[\/\s-]+/g, '_') // Replace slashes, spaces, hyphens with underscores
-          .replace(/_{2,}/g, '_')    // Collapse multiple underscores to a single one
-          .replace(/^_+|_+$/g, '');  // Trim leading/trailing underscores
+          .replace(/[\/\s-]+/g, '_') 
+          .replace(/_{2,}/g, '_')    
+          .replace(/^_+|_+$/g, '');  
 
         if (!formattedValuePart) {
           commandsArray.push(`# Skipping CREATE: Resulting name part is empty after sanitization: ${trimmedLine}`);
           return;
         }
-        newName = `${baseName.trim()}_${objectType}_${formattedValuePart}`;
-      } else { // operationType === 'rename'
-        // For rename, the suffix part is sanitized to replace dots as well (among other characters)
+        newName = `${baseName.trim()}_${objectType}_${formattedValuePart}`.toUpperCase();
+      } else { 
         const sanitizedSuffixForRename = valuePartForNewNameConstruction
-            .replace(/[.\/\s-]+/g, '_') // Replace dots, slashes, spaces, hyphens with underscores
-            .replace(/_{2,}/g, '_')    // Collapse multiple underscores
-            .replace(/^_+|_+$/g, '');  // Trim leading/trailing underscores
+            .replace(/[.\/\s-]+/g, '_') 
+            .replace(/_{2,}/g, '_')    
+            .replace(/^_+|_+$/g, '');  
 
          if (!sanitizedSuffixForRename) {
           commandsArray.push(`# Skipping RENAME: Resulting name suffix is empty after sanitization: ${trimmedLine} (using suffix: ${valuePartForNewNameConstruction})`);
           return;
         }
-        newName = `${baseName.trim()}_${objectType}_${sanitizedSuffixForRename}`;
+        newName = `${baseName.trim()}_${objectType}_${sanitizedSuffixForRename}`.toUpperCase();
       }
 
 
@@ -136,7 +133,7 @@ export default function PaloAltoForm() {
         commandsArray.push(`set address ${newName} description "${descriptionForNewObject}"`);
         commandsArray.push(`set address ${newName} tag [ ${effectiveTag} ]\n`);
         objectNamesForGroup.push(newName);
-      } else { // operationType === 'create'
+      } else { 
         switch (objectType) {
           case 'HST':
             const hostIp = valuePartForObjectDefinition.includes('/') ? valuePartForObjectDefinition : `${valuePartForObjectDefinition}/32`;
@@ -160,7 +157,7 @@ export default function PaloAltoForm() {
 
     if (addToGroup && objectNamesForGroup.length > 0) {
       const sanitizedGroupSuffix = addressGroupSuffix.trim().replace(/[.\/\-\s]+/g, '_');
-      const groupName = `${baseName.trim()}_ADG_${sanitizedGroupSuffix || ''}`;
+      const groupName = `${baseName.trim()}_ADG_${sanitizedGroupSuffix || ''}`.toUpperCase();
       commandsArray.push(`\n# Address Group Configuration`);
       commandsArray.push(`set address-group ${groupName} static [ ${objectNamesForGroup.join(' ')} ]`);
       if (!addressGroupSuffix.trim()) {
@@ -264,6 +261,8 @@ main.example.com`;
     }
     return createPlaceholder;
   }
+  
+  const displaySanitizedSuffix = addressGroupSuffix.trim().replace(/[.\/\-\s]+/g, '_');
 
   return (
     <Card className="w-full shadow-xl bg-card text-card-foreground">
@@ -273,7 +272,7 @@ main.example.com`;
           <CardTitle className="font-headline text-2xl text-primary">Configuration</CardTitle>
         </div>
         <CardDescription className="text-card-foreground/80">
-          {/* This line has been removed */}
+          
         </CardDescription>
       </CardHeader>
       <form onSubmit={handleGenerateCommands}>
@@ -363,13 +362,13 @@ main.example.com`;
               <Input
                 id="addressGroupSuffix"
                 type="text"
-                placeholder="e.g., WebServers (ZoneName_ADG_WebServers)"
+                placeholder="e.g., WebServers (ZoneName_ADG_WEBSERVERS)"
                 value={addressGroupSuffix}
                 onChange={(e) => setAddressGroupSuffix(e.target.value)}
                 className="focus:ring-ring"
               />
               <p className="text-xs text-muted-foreground">
-                Final group name: {baseName.trim() || "[ZoneName]"}_ADG_{addressGroupSuffix.trim().replace(/[.\/\-\s]+/g, '_') || <span className="italic">(no suffix)</span>}
+                Final group name: {`${(baseName.trim() || "[ZoneName]").toUpperCase()}_ADG_${(displaySanitizedSuffix).toUpperCase()}`}{!displaySanitizedSuffix && <span className="italic">(NO SUFFIX)</span>}
               </p>
             </div>
           )}
@@ -457,3 +456,5 @@ main.example.com`;
     </Card>
   );
 }
+
+    
