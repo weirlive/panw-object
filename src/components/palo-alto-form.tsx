@@ -61,14 +61,14 @@ export default function PaloAltoForm() {
       if (!trimmedLine) return;
 
       let valuePartForNewNameConstruction: string;
-      let valuePartForObjectDefinition: string;
+      let valuePartForObjectDefinition: string = ''; // Initialize for create
       let descriptionForNewObject = trimmedLine; 
       let originalObjectNameForRename: string | undefined = undefined;
 
       if (operationType === 'rename') {
         if (objectType === 'FQDN') {
-          originalObjectNameForRename = trimmedLine;
-          valuePartForNewNameConstruction = trimmedLine;
+          originalObjectNameForRename = trimmedLine; // FQDN itself is the original name
+          valuePartForNewNameConstruction = trimmedLine; // FQDN itself is used for the new name's suffix
         } else {
           const lastUnderscoreIndex = trimmedLine.lastIndexOf('_');
           if (lastUnderscoreIndex === -1 || lastUnderscoreIndex === 0 || lastUnderscoreIndex === trimmedLine.length - 1) {
@@ -87,7 +87,7 @@ export default function PaloAltoForm() {
              return;
           }
         }
-      } else { 
+      } else { // Create operation
         valuePartForNewNameConstruction = trimmedLine;
         valuePartForObjectDefinition = trimmedLine;
 
@@ -100,6 +100,9 @@ export default function PaloAltoForm() {
       let newName: string;
 
       if (operationType === 'create') {
+        // For create, always use _ as primary separator.
+        // Preserve dots in valuePartForNewNameConstruction (e.g. for IPs, FQDNs)
+        // by replacing only slashes, spaces, hyphens.
         let formattedValuePart = valuePartForNewNameConstruction
           .replace(/[\/\s-]+/g, '_') 
           .replace(/_{2,}/g, '_')    
@@ -109,31 +112,45 @@ export default function PaloAltoForm() {
           commandsArray.push(`# Skipping CREATE: Resulting name part is empty after sanitization: ${trimmedLine}`);
           return;
         }
-        newName = `${baseName.trim()}_${objectType}_${formattedValuePart}`.toUpperCase();
-      } else { 
-        const sanitizedSuffixForRename = valuePartForNewNameConstruction
-            .replace(/[.\/\s-]+/g, '_') 
-            .replace(/_{2,}/g, '_')    
-            .replace(/^_+|_+$/g, '');  
+        newName = `${baseName.trim()}_${objectType}_${formattedValuePart}`;
+      } else { // rename
+        let sanitizedSuffixForRename;
+        if (objectType === 'FQDN') {
+             // For FQDN rename, valuePartForNewNameConstruction is the FQDN itself.
+             // Preserve dots, replace slashes, spaces, hyphens with underscores.
+             sanitizedSuffixForRename = valuePartForNewNameConstruction
+                .replace(/[\/\s-]+/g, '_') // Preserves dots
+                .replace(/_{2,}/g, '_')    
+                .replace(/^_+|_+$/g, '');  
+        } else {
+            // For other types, valuePartForNewNameConstruction is the suffix part.
+            // Original behavior: replace dots, slashes, spaces, hyphens in the suffix with underscores.
+            sanitizedSuffixForRename = valuePartForNewNameConstruction
+                .replace(/[.\/\s-]+/g, '_') 
+                .replace(/_{2,}/g, '_')    
+                .replace(/^_+|_+$/g, '');  
+        }
 
          if (!sanitizedSuffixForRename) {
           commandsArray.push(`# Skipping RENAME: Resulting name suffix is empty after sanitization: ${trimmedLine} (using suffix: ${valuePartForNewNameConstruction})`);
           return;
         }
-        newName = `${baseName.trim()}_${objectType}_${sanitizedSuffixForRename}`.toUpperCase();
+        newName = `${baseName.trim()}_${objectType}_${sanitizedSuffixForRename}`;
       }
+
+      newName = newName.toUpperCase();
 
 
       if (operationType === 'rename') {
-        if (!originalObjectNameForRename) {
+        if (!originalObjectNameForRename) { // Should be caught earlier but good failsafe
              commandsArray.push(`# Skipping RENAME: Could not determine original object name for: ${trimmedLine}`);
              return;
         }
         commandsArray.push(`rename address ${originalObjectNameForRename} to ${newName}`);
         commandsArray.push(`set address ${newName} description "${descriptionForNewObject}"`);
-        commandsArray.push(`set address ${newName} tag [ ${effectiveTag} ]\n`);
+        commandsArray.push(`set address ${newName} tag [ ${effectiveTag.toUpperCase()} ]\n`);
         objectNamesForGroup.push(newName);
-      } else { 
+      } else { // create
         switch (objectType) {
           case 'HST':
             const hostIp = valuePartForObjectDefinition.includes('/') ? valuePartForObjectDefinition : `${valuePartForObjectDefinition}/32`;
@@ -150,14 +167,16 @@ export default function PaloAltoForm() {
             break;
         }
         commandsArray.push(`set address ${newName} description "${descriptionForNewObject}"`);
-        commandsArray.push(`set address ${newName} tag [ ${effectiveTag} ]\n`);
+        commandsArray.push(`set address ${newName} tag [ ${effectiveTag.toUpperCase()} ]\n`);
         objectNamesForGroup.push(newName);
       }
     });
 
     if (addToGroup && objectNamesForGroup.length > 0) {
       const sanitizedGroupSuffix = addressGroupSuffix.trim().replace(/[.\/\-\s]+/g, '_');
-      const groupName = `${baseName.trim()}_ADG_${sanitizedGroupSuffix || ''}`.toUpperCase();
+      const groupNameBase = `${baseName.trim()}_ADG_`;
+      const groupName = `${groupNameBase}${sanitizedGroupSuffix ? sanitizedGroupSuffix : ''}`.toUpperCase();
+      
       commandsArray.push(`\n# Address Group Configuration`);
       commandsArray.push(`set address-group ${groupName} static [ ${objectNamesForGroup.join(' ')} ]`);
       if (!addressGroupSuffix.trim()) {
@@ -235,7 +254,7 @@ const fqdnRenamePlaceholder =
 #
 # Paste one FQDN per line.
 # This FQDN will be the original object name, and also used
-# to construct the suffix of the new object name.
+# to construct the suffix of the new object name (dots preserved).
 
 server.mycompany.com
 app.internal.net`;
@@ -250,6 +269,7 @@ app.internal.net`;
 #
 # Paste one value per line.
 # This value will be used for the object and its description.
+# For FQDNs, dots in the value are preserved in the object name.
 
 1.1.1.1
 10.20.0.0/24
@@ -394,10 +414,10 @@ main.example.com`;
             <p className="text-xs text-muted-foreground">
               {operationType === 'rename'
                 ? (objectType === 'FQDN'
-                    ? "Format: `OriginalFQDN`. This FQDN will be used as the original name and as the base for the new object name suffix."
+                    ? "Format: `OriginalFQDN`. This FQDN will be used as the original name and as the base for the new object name suffix (dots preserved)."
                     : "Format: `OriginalName_SuffixForNewName`. Suffix is used for new object name."
                   )
-                : "Format: Actual Value (e.g., 1.2.3.4 for Host, 10.0.0.0/16 for Subnet)."
+                : "Format: Actual Value (e.g., 1.2.3.4 for Host, 10.0.0.0/16 for Subnet). For FQDNs, dots in the value are preserved in the object name."
               }
               {' '}Value type depends on selected Object Type. Paste one entry per line.
             </p>
@@ -456,5 +476,3 @@ main.example.com`;
     </Card>
   );
 }
-
-    
