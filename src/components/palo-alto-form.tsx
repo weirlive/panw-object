@@ -9,7 +9,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from "@/components/ui/checkbox";
-import { Switch } from "@/components/ui/switch";
 import { ClipboardCopy, ClipboardCheck, TerminalSquare, Settings2, Edit3, PlusSquare, ListPlus } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 
@@ -55,14 +54,14 @@ export default function PaloAltoForm() {
     const lines = objectListInput.split('\n');
     const commandsArray: string[] = [];
     const objectNamesForGroup: string[] = [];
-    const effectiveTag = tag.trim() || baseName.trim(); 
+    const effectiveTag = tag.trim() || baseName.trim();
 
     lines.forEach(line => {
       const trimmedLine = line.trim();
       if (!trimmedLine) return;
 
       let valuePartForNewNameConstruction: string;
-      let valuePartForObjectDefinition: string; 
+      let valuePartForObjectDefinition: string;
       let descriptionForNewObject: string;
       let originalObjectNameForRename: string | undefined = undefined;
 
@@ -74,33 +73,33 @@ export default function PaloAltoForm() {
         }
         originalObjectNameForRename = trimmedLine;
         valuePartForNewNameConstruction = trimmedLine.substring(lastUnderscoreIndex + 1);
-        descriptionForNewObject = originalObjectNameForRename; 
+        descriptionForNewObject = originalObjectNameForRename;
 
         if (!valuePartForNewNameConstruction) {
           commandsArray.push(`# Skipping RENAME: Malformed entry (empty suffix part after underscore): ${trimmedLine}`);
           return;
         }
-      } else { 
+      } else {
         valuePartForNewNameConstruction = trimmedLine;
-        valuePartForObjectDefinition = trimmedLine; 
-        descriptionForNewObject = trimmedLine; 
+        valuePartForObjectDefinition = trimmedLine;
+        descriptionForNewObject = trimmedLine;
 
         if (!valuePartForObjectDefinition.trim()) {
              commandsArray.push(`# Skipping CREATE: Empty value provided: ${trimmedLine}`);
              return;
         }
       }
-      
+
       const sanitizedValuePart = valuePartForNewNameConstruction.replace(/[.\/\s-]+/g, '_');
       const newName = `${baseName.trim()}_${objectType}_${sanitizedValuePart}`;
-      
+
       if (operationType === 'rename') {
-        if (!originalObjectNameForRename) return; 
+        if (!originalObjectNameForRename) return;
         commandsArray.push(`rename address ${originalObjectNameForRename} to ${newName}`);
         commandsArray.push(`set address ${newName} description "${descriptionForNewObject}"`);
         commandsArray.push(`set address ${newName} tag [ ${effectiveTag} ]\n`);
         objectNamesForGroup.push(newName);
-      } else { 
+      } else {
         switch (objectType) {
           case 'HST':
             const hostIp = valuePartForObjectDefinition.includes('/') ? valuePartForObjectDefinition : `${valuePartForObjectDefinition}/32`;
@@ -132,7 +131,7 @@ export default function PaloAltoForm() {
       } else {
         commandsArray.push(`set address-group ${groupName} description "${addressGroupSuffix.trim()}"`);
       }
-      commandsArray.push(''); 
+      commandsArray.push('');
     }
 
     setGeneratedCommands(commandsArray.join('\n'));
@@ -184,7 +183,7 @@ export default function PaloAltoForm() {
     }
   };
 
-  const renamePlaceholder = 
+  const renamePlaceholder =
 `# Examples (OriginalObjectName_SuffixForNewName):
 # MyServer_192.168.1.10
 # CorpNet_10.10.0.0/16
@@ -251,22 +250,23 @@ main.example.com`;
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
               <Label className="font-semibold text-card-foreground/90">Type</Label>
-              <div className="flex items-center space-x-2 pt-1">
-                <Label htmlFor="operation-switch" className="font-normal flex items-center cursor-pointer">
-                  <Edit3 className="mr-2 h-4 w-4 text-primary/80" /> Rename
-                </Label>
-                <Switch
-                  id="operation-switch"
-                  checked={operationType === 'create'}
-                  onCheckedChange={(checked) => {
-                    setOperationType(checked ? 'create' : 'rename');
-                  }}
-                  aria-label={`Switch to ${operationType === 'create' ? 'Rename' : 'Create'} mode`}
-                />
-                <Label htmlFor="operation-switch" className="font-normal flex items-center cursor-pointer">
-                  <PlusSquare className="mr-2 h-4 w-4 text-primary/80" /> Create
-                </Label>
-              </div>
+              <Select value={operationType} onValueChange={(value) => setOperationType(value as OperationType)}>
+                <SelectTrigger className="w-full focus:ring-ring">
+                  <SelectValue placeholder="Select operation type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="rename">
+                    <div className="flex items-center">
+                      <Edit3 className="mr-2 h-4 w-4 text-primary/80" /> Rename
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="create">
+                     <div className="flex items-center">
+                      <PlusSquare className="mr-2 h-4 w-4 text-primary/80" /> Create
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label className="font-semibold text-card-foreground/90">Object Type</Label>
@@ -283,7 +283,7 @@ main.example.com`;
               </Select>
             </div>
           </div>
-          
+
           <div className="space-y-2">
             <div className="flex items-center space-x-2">
               <Checkbox
@@ -299,7 +299,7 @@ main.example.com`;
           </div>
 
           {addToGroup && (
-            <div className="space-y-2 pl-7"> 
+            <div className="space-y-2 pl-7">
               <Label htmlFor="addressGroupSuffix" className="font-semibold text-card-foreground/90">
                 Address Group Name Suffix (Optional)
               </Label>
@@ -331,7 +331,7 @@ main.example.com`;
               className="focus:ring-ring font-code text-sm"
             />
             <p className="text-xs text-muted-foreground">
-              {operationType === 'rename' 
+              {operationType === 'rename'
                 ? "Format: `OriginalName_SuffixForNewName`. Suffix is used for new object name."
                 : "Format: Actual Value (e.g., 1.2.3.4 for Host, 10.0.0.0/16 for Subnet)."
               }
@@ -340,9 +340,9 @@ main.example.com`;
           </div>
         </CardContent>
         <CardFooter className="flex flex-col sm:flex-row justify-between items-center pt-6 border-t">
-           <Button 
-            type="submit" 
-            disabled={isLoading} 
+           <Button
+            type="submit"
+            disabled={isLoading}
             className="w-full sm:w-auto bg-accent hover:bg-accent/90 text-accent-foreground active:scale-95 transition-transform duration-150 ease-in-out"
           >
             {isLoading ? (
@@ -361,9 +361,9 @@ main.example.com`;
             )}
           </Button>
           {generatedCommands && (
-             <Button 
-                type="button" 
-                onClick={handleCopyToClipboard} 
+             <Button
+                type="button"
+                onClick={handleCopyToClipboard}
                 variant="outline"
                 className="w-full sm:w-auto mt-4 sm:mt-0 border-primary text-primary hover:bg-primary/10 active:scale-95 transition-transform duration-150 ease-in-out"
             >
