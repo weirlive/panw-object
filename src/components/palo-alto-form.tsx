@@ -38,15 +38,7 @@ export default function PaloAltoForm() {
         setIsLoading(false);
         return;
     }
-    if (!tag.trim()) {
-        toast({
-            title: "Missing Tag",
-            description: "Please enter the Tag.",
-            variant: "destructive",
-        });
-        setIsLoading(false);
-        return;
-    }
+    // Tag is no longer mandatory here, will use baseName if tag is empty.
     if (!objectListInput.trim()) {
         toast({
             title: "Missing Object List/Values",
@@ -59,6 +51,7 @@ export default function PaloAltoForm() {
 
     const lines = objectListInput.split('\n');
     const commandsArray: string[] = [];
+    const effectiveTag = tag.trim() || baseName.trim(); // Use baseName if tag is empty
 
     lines.forEach(line => {
       const trimmedLine = line.trim();
@@ -95,13 +88,13 @@ export default function PaloAltoForm() {
       }
       
       const sanitizedValuePart = valuePartForNewNameConstruction.replace(/\./g, '_').replace(/\//g, '_').replace(/-/g, '_');
-      const newName = `${baseName}_${objectType}_${sanitizedValuePart}`;
+      const newName = `${baseName.trim()}_${objectType}_${sanitizedValuePart}`;
       
       if (operationType === 'rename') {
         if (!originalObjectNameForRename) return; // Should be caught by earlier checks
         commandsArray.push(`rename address ${originalObjectNameForRename} to ${newName}`);
         commandsArray.push(`set address ${newName} description "${descriptionForNewObject}"`);
-        commandsArray.push(`set address ${newName} tag [ ${tag} ]\n`);
+        commandsArray.push(`set address ${newName} tag [ ${effectiveTag} ]\n`);
       } else { // operationType === 'create'
         switch (objectType) {
           case 'HST':
@@ -119,7 +112,7 @@ export default function PaloAltoForm() {
             break;
         }
         commandsArray.push(`set address ${newName} description "${descriptionForNewObject}"`);
-        commandsArray.push(`set address ${newName} tag [ ${tag} ]\n`);
+        commandsArray.push(`set address ${newName} tag [ ${effectiveTag} ]\n`);
       }
     });
 
@@ -229,14 +222,13 @@ main.example.com`;
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="tag" className="font-semibold text-card-foreground/90">Tag</Label>
+              <Label htmlFor="tag" className="font-semibold text-card-foreground/90">Tag (Optional)</Label>
               <Input
                 id="tag"
                 type="text"
-                placeholder="e.g., CriticalServer"
+                placeholder="e.g., CriticalServer (uses Base Name if empty)"
                 value={tag}
                 onChange={(e) => setTag(e.target.value)}
-                required
                 className="focus:ring-ring"
               />
             </div>
@@ -366,4 +358,3 @@ main.example.com`;
     </Card>
   );
 }
-
