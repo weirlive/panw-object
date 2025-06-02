@@ -86,11 +86,11 @@ export default function PaloAltoForm() {
       let newName: string;
 
       if (operationType === 'create') {
-        // For create, always use _ as primary separator.
+        // For create, use _ as primary separator.
         // Preserve dots in valuePartForNewNameConstruction (e.g. for IPs, FQDNs)
         // by replacing only slashes, spaces, hyphens.
         let formattedValuePart = valuePartForNewNameConstruction
-          .replace(/[\/\s-]+/g, '_')
+          .replace(/[\/\s-]+/g, '_') // Preserves dots
           .replace(/_{2,}/g, '_')
           .replace(/^_+|_+$/g, '');
 
@@ -100,22 +100,13 @@ export default function PaloAltoForm() {
         }
         newName = `${baseName.trim()}_${objectType}_${formattedValuePart}`;
       } else { // rename
-        let sanitizedSuffixForRename;
-        if (objectType === 'FQDN') {
-             // For FQDN rename, valuePartForNewNameConstruction is the FQDN itself.
-             // Preserve dots, replace slashes, spaces, hyphens with underscores.
-             sanitizedSuffixForRename = valuePartForNewNameConstruction
-                .replace(/[\/\s-]+/g, '_') // Preserves dots
-                .replace(/_{2,}/g, '_')
-                .replace(/^_+|_+$/g, '');
-        } else {
-            // For other rename types, valuePartForNewNameConstruction is the original name.
-            // Replace dots, slashes, spaces, hyphens in it with underscores for the suffix.
-            sanitizedSuffixForRename = valuePartForNewNameConstruction
-                .replace(/[.\/\s-]+/g, '_') // Replaces dots too
-                .replace(/_{2,}/g, '_')
-                .replace(/^_+|_+$/g, '');
-        }
+        // For rename, valuePartForNewNameConstruction is the original object name.
+        // Preserve dots if they are part of an IP or FQDN-like structure within the original name,
+        // and replace other separators (slash, space, hyphen) with underscores for the suffix.
+        let sanitizedSuffixForRename = valuePartForNewNameConstruction
+            .replace(/[\/\s-]+/g, '_') // Preserves dots, replaces slashes, spaces, hyphens
+            .replace(/_{2,}/g, '_')
+            .replace(/^_+|_+$/g, '');
 
          if (!sanitizedSuffixForRename) {
           commandsArray.push(`# Skipping RENAME: Resulting name suffix is empty after sanitization: ${trimmedLine} (using suffix derived from: ${valuePartForNewNameConstruction})`);
@@ -132,6 +123,7 @@ export default function PaloAltoForm() {
              commandsArray.push(`# Skipping RENAME: Could not determine original object name for: ${trimmedLine}`);
              return;
         }
+        descriptionForNewObject = originalObjectNameForRename; // Use original name as description for renamed object
         commandsArray.push(`rename address ${originalObjectNameForRename} to ${newName}`);
         commandsArray.push(`set address ${newName} description "${descriptionForNewObject}"`);
         commandsArray.push(`set address ${newName} tag [ ${effectiveTag.toUpperCase()} ]\n`);
@@ -166,7 +158,7 @@ export default function PaloAltoForm() {
       commandsArray.push(`\n# Address Group Configuration`);
       commandsArray.push(`set address-group ${groupName} static [ ${objectNamesForGroup.join(' ')} ]`);
       if (!addressGroupSuffix.trim()) {
-        commandsArray.push(`set address-group ${groupName} description "Address group for ${baseName.trim()}"`);
+        commandsArray.push(`set address-group ${groupName} description "Address group for ${baseName.trim().toUpperCase()}"`);
       } else {
         commandsArray.push(`set address-group ${groupName} description "${addressGroupSuffix.trim()}"`);
       }
@@ -225,14 +217,17 @@ export default function PaloAltoForm() {
 const renamePlaceholderBase =
 `# Examples (Original Object Name, one per line):
 # MyExistingServer
-# CorporateFirewall_Subnet_Internal
+# Corporate_Subnet_Internal
 # old.fqdn.example.com
+# My.Server.IP
 #
 # Paste one original object name per line.
-# This name will be used as the 'from' part of the rename command.
-# It will also be sanitized to form the suffix of the new object name:
-# ZoneName_ObjectType_SanitizedOriginalName
-# (e.g., for FQDNs, 'old.fqdn' suffix becomes 'OLD.FQDN'; for others, 'My.Server' suffix becomes 'MY_SERVER')`;
+# The new name will be: ZoneName_ObjectType_SanitizedOriginalName
+# Dots (.) in the Original Object Name (e.g., in IPs or FQDNs) will be PRESERVED in the SanitizedOriginalName part.
+# Other special characters (slashes, spaces, hyphens) will be replaced with underscores.
+# e.g., original 'old.fqdn.example.com' -> suffix part 'OLD.FQDN.EXAMPLE.COM'
+# e.g., original 'My.Server' -> suffix part 'MY.SERVER'
+# e.g., original 'Server/1' -> suffix part 'SERVER_1'`;
 
 
   const createPlaceholder =
@@ -244,7 +239,8 @@ const renamePlaceholderBase =
 #
 # Paste one value per line.
 # This value will be used for the object and its description.
-# For FQDNs, dots in the value are preserved in the object name suffix.
+# Dots in the value (e.g., in IPs or FQDNs) are preserved in the object name suffix.
+# Other special characters (slashes, spaces, hyphens) become underscores.
 # New name: ZoneName_ObjectType_SanitizedValue
 
 1.1.1.1
@@ -267,9 +263,6 @@ main.example.com`;
           <Settings2 className="h-6 w-6 text-primary" />
           <CardTitle className="font-headline text-2xl text-primary">Configuration</CardTitle>
         </div>
-        <CardDescription className="text-card-foreground/80">
-
-        </CardDescription>
       </CardHeader>
       <form onSubmit={handleGenerateCommands}>
         <CardContent className="space-y-6">
@@ -387,8 +380,8 @@ main.example.com`;
             />
             <p className="text-xs text-muted-foreground">
               {operationType === 'rename'
-                ? "Format: `OriginalObjectName`. This is the current name of the object. The new name will be `ZoneName_ObjectType_SanitizedOriginalName`. For FQDN Object Type, dots in `SanitizedOriginalName` are preserved (e.g., `old.host.com` becomes `OLD.HOST.COM`); for other Object Types, dots are replaced with underscores (e.g., `Server.1` becomes `SERVER_1`)."
-                : "Format: Actual Value (e.g., 1.2.3.4 for Host, 10.0.0.0/16 for Subnet). New name: `ZoneName_ObjectType_SanitizedValue`. For FQDN Object Type, dots in the `SanitizedValue` are preserved in the object name suffix."
+                ? "Format: `OriginalObjectName`. The new name will be `ZoneName_ObjectType_SanitizedOriginalName`. Dots present in the `OriginalObjectName` (like in IPs or FQDNs) will be preserved in the `SanitizedOriginalName` part. Other special characters (slashes, spaces, hyphens) will be replaced by underscores."
+                : "Format: Actual Value (e.g., 1.2.3.4 for Host, 10.0.0.0/16 for Subnet). New name: `ZoneName_ObjectType_SanitizedValue`. Dots in the `SanitizedValue` (like in IP addresses or FQDNs for their respective object types) are preserved in the object name suffix. Other special characters (slashes, spaces, hyphens) become underscores."
               }
               {' '}Value type depends on selected Object Type. Paste one entry per line.
             </p>
