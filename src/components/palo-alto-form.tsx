@@ -90,18 +90,32 @@ export default function PaloAltoForm() {
         }
       }
 
-      const sanitizedValuePart = valuePartForNewNameConstruction.replace(/[.\/\s-]+/g, '_');
       let newName: string;
 
       if (operationType === 'create') {
-        newName = `${baseName.trim()}.${objectType}.${sanitizedValuePart}`;
+        let formattedValuePart = valuePartForNewNameConstruction
+          .replace(/[\/\s-]+/g, '_') // Replace slashes, spaces, hyphens with underscores
+          .replace(/_{2,}/g, '_')    // Collapse multiple underscores to a single one
+          .replace(/^_+|_+$/g, '');  // Trim leading/trailing underscores
+
+        if (!formattedValuePart) {
+          commandsArray.push(`# Skipping CREATE: Resulting name part is empty after sanitization: ${trimmedLine}`);
+          return;
+        }
+        newName = `${baseName.trim()}_${objectType}_${formattedValuePart}`;
       } else { // operationType === 'rename'
-        newName = `${baseName.trim()}_${objectType}_${sanitizedValuePart}`;
+        // For rename, the suffix part is sanitized to replace dots as well
+        const sanitizedSuffixForRename = valuePartForNewNameConstruction.replace(/[.\/\s-]+/g, '_');
+         if (!sanitizedSuffixForRename) {
+          commandsArray.push(`# Skipping RENAME: Resulting name suffix is empty after sanitization: ${trimmedLine} (using suffix: ${valuePartForNewNameConstruction})`);
+          return;
+        }
+        newName = `${baseName.trim()}_${objectType}_${sanitizedSuffixForRename}`;
       }
 
 
       if (operationType === 'rename') {
-        if (!originalObjectNameForRename) return;
+        if (!originalObjectNameForRename) return; // Should not happen due to earlier checks
         commandsArray.push(`rename address ${originalObjectNameForRename} to ${newName}`);
         commandsArray.push(`set address ${newName} description "${descriptionForNewObject}"`);
         commandsArray.push(`set address ${newName} tag [ ${effectiveTag} ]\n`);
@@ -262,7 +276,7 @@ main.example.com`;
                   <SelectValue placeholder="Select operation type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="create">
+                   <SelectItem value="create">
                      <div className="flex items-center">
                       <PlusSquare className="mr-2 h-4 w-4 text-primary/80" /> Create
                     </div>
