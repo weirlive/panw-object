@@ -49,8 +49,8 @@ export default function PaloAltoForm() {
     }
     if (!objectListInput.trim()) {
         toast({
-            title: "Missing Object List",
-            description: "Please paste your object list.",
+            title: "Missing Object List/Values",
+            description: "Please paste your object list or values.",
             variant: "destructive",
         });
         setIsLoading(false);
@@ -64,46 +64,61 @@ export default function PaloAltoForm() {
       const trimmedLine = line.trim();
       if (!trimmedLine) return;
 
-      const lastUnderscoreIndex = trimmedLine.lastIndexOf('_');
-      
-      if (lastUnderscoreIndex === -1) {
-        commandsArray.push(`# Skipping malformed entry (no underscore to separate name/value): ${trimmedLine}`);
-        return;
-      }
+      let valuePartForNewNameConstruction: string;
+      let valuePartForObjectDefinition: string; // Only for 'create'
+      let descriptionForNewObject: string;
+      let originalObjectNameForRename: string | undefined = undefined;
 
-      const descriptiveNamePart = trimmedLine.substring(0, lastUnderscoreIndex);
-      const valuePart = trimmedLine.substring(lastUnderscoreIndex + 1);
-
-      if (!valuePart) { 
-          commandsArray.push(`# Skipping malformed entry (empty value part): ${trimmedLine}`);
+      if (operationType === 'rename') {
+        const lastUnderscoreIndex = trimmedLine.lastIndexOf('_');
+        if (lastUnderscoreIndex === -1) {
+          commandsArray.push(`# Skipping RENAME: Malformed entry (expected OriginalName_SuffixForNewName): ${trimmedLine}`);
           return;
+        }
+        originalObjectNameForRename = trimmedLine;
+        valuePartForNewNameConstruction = trimmedLine.substring(lastUnderscoreIndex + 1);
+        descriptionForNewObject = originalObjectNameForRename; 
+
+        if (!valuePartForNewNameConstruction) {
+          commandsArray.push(`# Skipping RENAME: Malformed entry (empty suffix part after underscore): ${trimmedLine}`);
+          return;
+        }
+      } else { // operationType === 'create'
+        valuePartForNewNameConstruction = trimmedLine;
+        valuePartForObjectDefinition = trimmedLine; 
+        descriptionForNewObject = trimmedLine; // Use the input value as description
+
+        if (!valuePartForObjectDefinition.trim()) {
+             commandsArray.push(`# Skipping CREATE: Empty value provided: ${trimmedLine}`);
+             return;
+        }
       }
       
-      const valueForNewName = valuePart.replace(/\./g, '_').replace(/\//g, '_').replace(/-/g, '_');
-      const newName = `${baseName}_${objectType}_${valueForNewName}`;
+      const sanitizedValuePart = valuePartForNewNameConstruction.replace(/\./g, '_').replace(/\//g, '_').replace(/-/g, '_');
+      const newName = `${baseName}_${objectType}_${sanitizedValuePart}`;
       
       if (operationType === 'rename') {
-        const originalObjectName = trimmedLine;
-        commandsArray.push(`rename address ${originalObjectName} to ${newName}`);
-        commandsArray.push(`set address ${newName} description "${originalObjectName}"`);
+        if (!originalObjectNameForRename) return; // Should be caught by earlier checks
+        commandsArray.push(`rename address ${originalObjectNameForRename} to ${newName}`);
+        commandsArray.push(`set address ${newName} description "${descriptionForNewObject}"`);
         commandsArray.push(`set address ${newName} tag [ ${tag} ]\n`);
       } else { // operationType === 'create'
         switch (objectType) {
           case 'HST':
-            const hostIp = valuePart.includes('/') ? valuePart : `${valuePart}/32`;
+            const hostIp = valuePartForObjectDefinition.includes('/') ? valuePartForObjectDefinition : `${valuePartForObjectDefinition}/32`;
             commandsArray.push(`set address ${newName} ip-netmask ${hostIp}`);
             break;
           case 'SBN':
-            commandsArray.push(`set address ${newName} ip-netmask ${valuePart}`);
+            commandsArray.push(`set address ${newName} ip-netmask ${valuePartForObjectDefinition}`);
             break;
           case 'ADR':
-            commandsArray.push(`set address ${newName} ip-range ${valuePart}`);
+            commandsArray.push(`set address ${newName} ip-range ${valuePartForObjectDefinition}`);
             break;
           case 'FQDN':
-            commandsArray.push(`set address ${newName} fqdn ${valuePart}`);
+            commandsArray.push(`set address ${newName} fqdn ${valuePartForObjectDefinition}`);
             break;
         }
-        commandsArray.push(`set address ${newName} description "${descriptiveNamePart}"`);
+        commandsArray.push(`set address ${newName} description "${descriptionForNewObject}"`);
         commandsArray.push(`set address ${newName} tag [ ${tag} ]\n`);
       }
     });
@@ -124,7 +139,7 @@ export default function PaloAltoForm() {
     } else {
          toast({
             title: "No Commands Generated",
-            description: "The object list might be empty or all entries were malformed.",
+            description: "The object list might be empty or all entries were malformed/empty.",
             variant: "destructive"
         });
     }
@@ -156,6 +171,36 @@ export default function PaloAltoForm() {
       });
     }
   };
+
+  const renamePlaceholder = 
+`# Examples (OriginalObjectName_SuffixForNewName):
+# MyServer_192.168.1.10
+# CorpNet_10.10.0.0/16
+# DMZServers_172.16.1.5-172.16.1.20
+# GoogleDNS_google.com
+#
+# Paste one entry per line.
+# The SuffixForNewName part is used to construct the new object name.
+
+ProdServer_1.1.1.1
+StagingNet_10.20.0.0/24
+GuestRange_192.168.100.10-192.168.100.20
+MainSite_main.example.com`;
+
+  const createPlaceholder =
+`# Examples (one actual value per line):
+# 192.168.1.10
+# 10.10.0.0/16
+# 172.16.1.5-172.16.1.20
+# google.com
+#
+# Paste one value per line.
+# This value will be used for the object and its description.
+
+1.1.1.1
+10.20.0.0/24
+192.168.100.10-192.168.100.20
+main.example.com`;
 
   return (
     <Card className="w-full shadow-xl bg-card text-card-foreground">
@@ -248,25 +293,11 @@ export default function PaloAltoForm() {
           
           <div className="space-y-2">
             <Label htmlFor="objectList" className="font-semibold text-card-foreground/90">
-              {operationType === 'rename' ? 'Object List (OldName_ActualValue)' : 'Object Definitions (NameForDescription_ActualValue)'}
+              {operationType === 'rename' ? 'Object List (OriginalObjectName_SuffixForNewName)' : 'Object Values (One value per line)'}
             </Label>
             <Textarea
               id="objectList"
-              placeholder={
-`# Examples:
-# MyServer_192.168.1.10
-# CorpNet_10.10.0.0/16
-# DMZServers_172.16.1.5-172.16.1.20
-# GoogleDNS_google.com
-#
-# Paste one entry per line.
-# Format: UniqueIdentifier_ActualValue
-
-ProdServer_1.1.1.1
-StagingNet_10.20.0.0/24
-GuestRange_192.168.100.10-192.168.100.20
-MainSite_main.example.com`
-              }
+              placeholder={operationType === 'rename' ? renamePlaceholder : createPlaceholder}
               value={objectListInput}
               onChange={(e) => setObjectListInput(e.target.value)}
               required
@@ -274,8 +305,11 @@ MainSite_main.example.com`
               className="focus:ring-ring font-code text-sm"
             />
             <p className="text-xs text-muted-foreground">
-              Format: `Name_Value` (e.g., ServerA_1.2.3.4, CorpNet_10.0.0.0/16, Range_1.1.1.1-1.1.1.5, Site_example.com).
-              Value type depends on selected Object Type.
+              {operationType === 'rename' 
+                ? "Format: `OriginalObjectName_SuffixForNewName` (e.g., OldServer_1.2.3.4). Suffix is used for new name."
+                : "Format: Actual Value (e.g., 1.2.3.4, 10.0.0.0/16, example.com). Paste one value per line."
+              }
+              {' '}Value type depends on selected Object Type.
             </p>
           </div>
         </CardContent>
@@ -332,3 +366,4 @@ MainSite_main.example.com`
     </Card>
   );
 }
+
