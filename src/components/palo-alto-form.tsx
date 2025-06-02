@@ -216,7 +216,7 @@ main.example.com`;
           <CardTitle className="font-headline text-2xl text-primary">Configuration</CardTitle>
         </div>
         <CardDescription className="text-card-foreground/80">
-          Enter the details below to generate your Palo Alto CLI commands.
+          {/* This line has been removed */}
         </CardDescription>
       </CardHeader>
       <form onSubmit={handleGenerateCommands}>
