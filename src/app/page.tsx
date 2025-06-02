@@ -6,7 +6,7 @@ export default function Home() {
       <div className="w-full max-w-2xl">
         <header className="text-center mb-8">
           <h1 className="font-headline text-4xl sm:text-5xl font-bold text-primary">
-            Palo Alto Command Generator
+            PANW Object Tool v28901
           </h1>
           <p className="text-muted-foreground mt-2 text-lg">
             Easily generate Palo Alto CLI commands for renaming and tagging address objects.
