@@ -34,8 +34,8 @@ export default function PaloAltoForm() {
 
     if (!baseName.trim()) {
         toast({
-            title: "Missing Base Name",
-            description: "Please enter the Base Name.",
+            title: "Missing Zone Name",
+            description: "Please enter the Zone Name.",
             variant: "destructive",
         });
         setIsLoading(false);
@@ -218,11 +218,11 @@ main.example.com`;
         <CardContent className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
-              <Label htmlFor="baseName" className="font-semibold text-card-foreground/90">Base Name</Label>
+              <Label htmlFor="baseName" className="font-semibold text-card-foreground/90">Zone Name</Label>
               <Input
                 id="baseName"
                 type="text"
-                placeholder="e.g., ZONE-NAME"
+                placeholder="e.g., DMZ-External"
                 value={baseName}
                 onChange={(e) => setBaseName(e.target.value)}
                 required
@@ -230,11 +230,11 @@ main.example.com`;
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="tag" className="font-semibold text-card-foreground/90">Tag (Optional)</Label>
+              <Label htmlFor="tag" className="font-semibold text-card-foreground/90">Tag (Optional, uses Zone Name if empty)</Label>
               <Input
                 id="tag"
                 type="text"
-                placeholder="e.g., CriticalServer (uses Base Name if empty)"
+                placeholder="e.g., CriticalServer (uses Zone Name if empty)"
                 value={tag}
                 onChange={(e) => setTag(e.target.value)}
                 className="focus:ring-ring"
@@ -319,7 +319,7 @@ main.example.com`;
                 className="focus:ring-ring"
               />
               <p className="text-xs text-muted-foreground">
-                Group name: {(baseName.trim() || "BaseName")}_ADG_{addressGroupSuffix.trim().replace(/[.\\/\\-\\s]+/g, '_') || (addressGroupSuffix.trim() ? "" : "")}
+                Group name: {(baseName.trim() || "ZoneName")}_ADG_{addressGroupSuffix.trim().replace(/[.\\/\\-\\s]+/g, '_') || (addressGroupSuffix.trim() ? "" : "")}
                 {!(addressGroupSuffix.trim()) && <span className="italic">(no suffix)</span>}
               </p>
             </div>
