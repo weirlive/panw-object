@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, type FormEvent } from 'react';
@@ -6,12 +7,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { ClipboardCopy, ClipboardCheck, TerminalSquare, Settings2 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 
 export default function PaloAltoForm() {
   const [baseName, setBaseName] = useState<string>('');
   const [tag, setTag] = useState<string>('');
+  const [objectType, setObjectType] = useState<string>('HST');
   const [objectListInput, setObjectListInput] = useState<string>('');
   const [generatedCommands, setGeneratedCommands] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -21,7 +24,7 @@ export default function PaloAltoForm() {
   const handleGenerateCommands = (event: FormEvent) => {
     event.preventDefault();
     setIsLoading(true);
-    setGeneratedCommands(''); 
+    setGeneratedCommands('');
 
     if (!baseName.trim()) {
         toast({
@@ -74,7 +77,7 @@ export default function PaloAltoForm() {
       }
       
       const ipForNewName = ipAddressPart.replace(/\./g, '_').replace(/\//g, '_'); 
-      const newName = `${baseName}_HST_${ipForNewName}`;
+      const newName = `${baseName}_${objectType}_${ipForNewName}`;
       
       commandsArray.push(`rename address ${originalObjectName} to ${newName}`);
       commandsArray.push(`set address ${newName} description "${originalObjectName}"`);
@@ -163,6 +166,34 @@ export default function PaloAltoForm() {
               />
             </div>
           </div>
+
+          <div className="space-y-2">
+            <Label className="font-semibold text-card-foreground/90">Object Type</Label>
+            <RadioGroup
+              defaultValue="HST"
+              value={objectType}
+              onValueChange={setObjectType}
+              className="flex flex-col space-y-2 pt-1 sm:flex-row sm:flex-wrap sm:space-y-0 sm:space-x-4"
+            >
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="HST" id="r-hst" />
+                <Label htmlFor="r-hst" className="font-normal">Host (HST)</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="SBN" id="r-sbn" />
+                <Label htmlFor="r-sbn" className="font-normal">Subnet (SBN)</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="ADR" id="r-adr" />
+                <Label htmlFor="r-adr" className="font-normal">Address Range (ADR)</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="FQDN" id="r-fqdn" />
+                <Label htmlFor="r-fqdn" className="font-normal">FQDN</Label>
+              </div>
+            </RadioGroup>
+          </div>
+          
           <div className="space-y-2">
             <Label htmlFor="objectList" className="font-semibold text-card-foreground/90">Object List (OldName_IP)</Label>
             <Textarea
@@ -230,3 +261,4 @@ export default function PaloAltoForm() {
     </Card>
   );
 }
+
