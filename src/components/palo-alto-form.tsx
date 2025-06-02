@@ -79,7 +79,7 @@ export default function PaloAltoForm() {
           commandsArray.push(`# Skipping RENAME: Malformed entry (empty suffix part after underscore): ${trimmedLine}`);
           return;
         }
-      } else {
+      } else { // operationType === 'create'
         valuePartForNewNameConstruction = trimmedLine;
         valuePartForObjectDefinition = trimmedLine;
         descriptionForNewObject = trimmedLine;
@@ -91,7 +91,14 @@ export default function PaloAltoForm() {
       }
 
       const sanitizedValuePart = valuePartForNewNameConstruction.replace(/[.\/\s-]+/g, '_');
-      const newName = `${baseName.trim()}_${objectType}_${sanitizedValuePart}`;
+      let newName: string;
+
+      if (operationType === 'create') {
+        newName = `${baseName.trim()}.${objectType}.${sanitizedValuePart}`;
+      } else { // operationType === 'rename'
+        newName = `${baseName.trim()}_${objectType}_${sanitizedValuePart}`;
+      }
+
 
       if (operationType === 'rename') {
         if (!originalObjectNameForRename) return;
@@ -99,7 +106,7 @@ export default function PaloAltoForm() {
         commandsArray.push(`set address ${newName} description "${descriptionForNewObject}"`);
         commandsArray.push(`set address ${newName} tag [ ${effectiveTag} ]\n`);
         objectNamesForGroup.push(newName);
-      } else {
+      } else { // operationType === 'create'
         switch (objectType) {
           case 'HST':
             const hostIp = valuePartForObjectDefinition.includes('/') ? valuePartForObjectDefinition : `${valuePartForObjectDefinition}/32`;
