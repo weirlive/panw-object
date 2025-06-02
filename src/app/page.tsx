@@ -8,9 +8,6 @@ export default function Home() {
           <h1 className="font-headline text-4xl sm:text-5xl font-bold text-primary">
             PANW OBJECT TOOL
           </h1>
-          <p className="text-muted-foreground mt-2 text-lg">
-            Easily generate Palo Alto CLI commands for renaming and tagging address objects.
-          </p>
         </header>
         <PaloAltoForm />
       </div>
