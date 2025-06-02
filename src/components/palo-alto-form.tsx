@@ -8,13 +8,16 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { ClipboardCopy, ClipboardCheck, TerminalSquare, Settings2 } from 'lucide-react';
+import { ClipboardCopy, ClipboardCheck, TerminalSquare, Settings2, Edit3, PlusSquare } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
+
+type OperationType = 'rename' | 'create';
 
 export default function PaloAltoForm() {
   const [baseName, setBaseName] = useState<string>('');
   const [tag, setTag] = useState<string>('');
   const [objectType, setObjectType] = useState<string>('HST');
+  const [operationType, setOperationType] = useState<OperationType>('rename');
   const [objectListInput, setObjectListInput] = useState<string>('');
   const [generatedCommands, setGeneratedCommands] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -64,35 +67,62 @@ export default function PaloAltoForm() {
       const lastUnderscoreIndex = trimmedLine.lastIndexOf('_');
       
       if (lastUnderscoreIndex === -1) {
-        commandsArray.push(`# Skipping malformed entry (no underscore): ${trimmedLine}`);
+        commandsArray.push(`# Skipping malformed entry (no underscore to separate name/value): ${trimmedLine}`);
         return;
       }
 
-      const originalObjectName = trimmedLine; 
-      const ipAddressPart = trimmedLine.substring(lastUnderscoreIndex + 1);
+      const descriptiveNamePart = trimmedLine.substring(0, lastUnderscoreIndex);
+      const valuePart = trimmedLine.substring(lastUnderscoreIndex + 1);
 
-      if (!ipAddressPart) { 
-          commandsArray.push(`# Skipping malformed entry (empty IP part): ${trimmedLine}`);
+      if (!valuePart) { 
+          commandsArray.push(`# Skipping malformed entry (empty value part): ${trimmedLine}`);
           return;
       }
       
-      const ipForNewName = ipAddressPart.replace(/\./g, '_').replace(/\//g, '_'); 
-      const newName = `${baseName}_${objectType}_${ipForNewName}`;
+      const valueForNewName = valuePart.replace(/\./g, '_').replace(/\//g, '_').replace(/-/g, '_');
+      const newName = `${baseName}_${objectType}_${valueForNewName}`;
       
-      commandsArray.push(`rename address ${originalObjectName} to ${newName}`);
-      commandsArray.push(`set address ${newName} description "${originalObjectName}"`);
-      commandsArray.push(`set address ${newName} tag [ ${tag} ]\n`);
+      if (operationType === 'rename') {
+        const originalObjectName = trimmedLine;
+        commandsArray.push(`rename address ${originalObjectName} to ${newName}`);
+        commandsArray.push(`set address ${newName} description "${originalObjectName}"`);
+        commandsArray.push(`set address ${newName} tag [ ${tag} ]\n`);
+      } else { // operationType === 'create'
+        switch (objectType) {
+          case 'HST':
+            const hostIp = valuePart.includes('/') ? valuePart : `${valuePart}/32`;
+            commandsArray.push(`set address ${newName} ip-netmask ${hostIp}`);
+            break;
+          case 'SBN':
+            commandsArray.push(`set address ${newName} ip-netmask ${valuePart}`);
+            break;
+          case 'ADR':
+            commandsArray.push(`set address ${newName} ip-range ${valuePart}`);
+            break;
+          case 'FQDN':
+            commandsArray.push(`set address ${newName} fqdn ${valuePart}`);
+            break;
+        }
+        commandsArray.push(`set address ${newName} description "${descriptiveNamePart}"`);
+        commandsArray.push(`set address ${newName} tag [ ${tag} ]\n`);
+      }
     });
 
     setGeneratedCommands(commandsArray.join('\n'));
     setIsLoading(false);
-    if (commandsArray.length > 0) {
+    if (commandsArray.length > 0 && commandsArray.some(cmd => !cmd.startsWith('#'))) {
         toast({
             title: "Commands Generated",
             description: "Your Palo Alto CLI commands are ready.",
         });
-    } else {
+    } else if (commandsArray.every(cmd => cmd.startsWith('#')) && commandsArray.length > 0) {
         toast({
+            title: "No Valid Commands Generated",
+            description: "All entries were malformed or skipped.",
+            variant: "destructive"
+        });
+    } else {
+         toast({
             title: "No Commands Generated",
             description: "The object list might be empty or all entries were malformed.",
             variant: "destructive"
@@ -167,45 +197,86 @@ export default function PaloAltoForm() {
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label className="font-semibold text-card-foreground/90">Object Type</Label>
-            <RadioGroup
-              defaultValue="HST"
-              value={objectType}
-              onValueChange={setObjectType}
-              className="flex flex-col space-y-2 pt-1 sm:flex-row sm:flex-wrap sm:space-y-0 sm:space-x-4"
-            >
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="HST" id="r-hst" />
-                <Label htmlFor="r-hst" className="font-normal">Host (HST)</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="SBN" id="r-sbn" />
-                <Label htmlFor="r-sbn" className="font-normal">Subnet (SBN)</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="ADR" id="r-adr" />
-                <Label htmlFor="r-adr" className="font-normal">Address Range (ADR)</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="FQDN" id="r-fqdn" />
-                <Label htmlFor="r-fqdn" className="font-normal">FQDN</Label>
-              </div>
-            </RadioGroup>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <Label className="font-semibold text-card-foreground/90">Operation Type</Label>
+              <RadioGroup
+                value={operationType}
+                onValueChange={(value) => setOperationType(value as OperationType)}
+                className="flex flex-col space-y-2 pt-1 sm:flex-row sm:flex-wrap sm:space-y-0 sm:space-x-4"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="rename" id="op-rename" />
+                  <Label htmlFor="op-rename" className="font-normal flex items-center">
+                    <Edit3 className="mr-2 h-4 w-4 text-primary/80" /> Rename Existing
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="create" id="op-create" />
+                  <Label htmlFor="op-create" className="font-normal flex items-center">
+                    <PlusSquare className="mr-2 h-4 w-4 text-primary/80" /> Create New
+                  </Label>
+                </div>
+              </RadioGroup>
+            </div>
+            <div className="space-y-2">
+              <Label className="font-semibold text-card-foreground/90">Object Type</Label>
+              <RadioGroup
+                value={objectType}
+                onValueChange={setObjectType}
+                className="flex flex-col space-y-2 pt-1 sm:flex-row sm:flex-wrap sm:space-y-0 sm:space-x-4"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="HST" id="r-hst" />
+                  <Label htmlFor="r-hst" className="font-normal">Host (HST)</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="SBN" id="r-sbn" />
+                  <Label htmlFor="r-sbn" className="font-normal">Subnet (SBN)</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="ADR" id="r-adr" />
+                  <Label htmlFor="r-adr" className="font-normal">Address Range (ADR)</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="FQDN" id="r-fqdn" />
+                  <Label htmlFor="r-fqdn" className="font-normal">FQDN</Label>
+                </div>
+              </RadioGroup>
+            </div>
           </div>
           
           <div className="space-y-2">
-            <Label htmlFor="objectList" className="font-semibold text-card-foreground/90">Object List (OldName_IP)</Label>
+            <Label htmlFor="objectList" className="font-semibold text-card-foreground/90">
+              {operationType === 'rename' ? 'Object List (OldName_ActualValue)' : 'Object Definitions (NameForDescription_ActualValue)'}
+            </Label>
             <Textarea
               id="objectList"
-              placeholder="ServerA_192.168.1.10\nWebServer_10.0.0.5/24\nDB_Host_172.16.30.1"
+              placeholder={
+`# Examples:
+# MyServer_192.168.1.10
+# CorpNet_10.10.0.0/16
+# DMZServers_172.16.1.5-172.16.1.20
+# GoogleDNS_google.com
+#
+# Paste one entry per line.
+# Format: UniqueIdentifier_ActualValue
+
+ProdServer_1.1.1.1
+StagingNet_10.20.0.0/24
+GuestRange_192.168.100.10-192.168.100.20
+MainSite_main.example.com`
+              }
               value={objectListInput}
               onChange={(e) => setObjectListInput(e.target.value)}
               required
               rows={8}
-              className="focus:ring-ring"
+              className="focus:ring-ring font-code text-sm"
             />
-            <p className="text-xs text-muted-foreground">Paste one object per line. Example format: `OldName_1.2.3.4`</p>
+            <p className="text-xs text-muted-foreground">
+              Format: `Name_Value` (e.g., ServerA_1.2.3.4, CorpNet_10.0.0.0/16, Range_1.1.1.1-1.1.1.5, Site_example.com).
+              Value type depends on selected Object Type.
+            </p>
           </div>
         </CardContent>
         <CardFooter className="flex flex-col sm:flex-row justify-between items-center pt-6 border-t">
@@ -261,4 +332,3 @@ export default function PaloAltoForm() {
     </Card>
   );
 }
-
