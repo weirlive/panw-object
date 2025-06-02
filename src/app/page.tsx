@@ -16,11 +16,6 @@ export default function Home() {
         </header>
         <PaloAltoForm />
       </div>
-      <footer className="mt-12 text-center">
-        <p className="text-sm text-muted-foreground">
-          Powered by Naming Scheme 28901
-        </p>
-      </footer>
     </main>
   );
 }
