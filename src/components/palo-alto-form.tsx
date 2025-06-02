@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { ClipboardCopy, ClipboardCheck, TerminalSquare, Settings2, Edit3, PlusSquare, ListPlus } from 'lucide-react';
@@ -270,28 +270,17 @@ main.example.com`;
             </div>
             <div className="space-y-2">
               <Label className="font-semibold text-card-foreground/90">Object Type</Label>
-              <RadioGroup
-                value={objectType}
-                onValueChange={setObjectType}
-                className="flex flex-col space-y-2 pt-1 sm:flex-row sm:flex-wrap sm:space-y-0 sm:space-x-4"
-              >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="HST" id="r-hst" />
-                  <Label htmlFor="r-hst" className="font-normal">Host (HST)</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="SBN" id="r-sbn" />
-                  <Label htmlFor="r-sbn" className="font-normal">Subnet (SBN)</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="ADR" id="r-adr" />
-                  <Label htmlFor="r-adr" className="font-normal">Address Range (ADR)</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="FQDN" id="r-fqdn" />
-                  <Label htmlFor="r-fqdn" className="font-normal">FQDN</Label>
-                </div>
-              </RadioGroup>
+              <Select value={objectType} onValueChange={setObjectType}>
+                <SelectTrigger className="w-full focus:ring-ring">
+                  <SelectValue placeholder="Select object type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="HST">Host (HST)</SelectItem>
+                  <SelectItem value="SBN">Subnet (SBN)</SelectItem>
+                  <SelectItem value="ADR">Address Range (ADR)</SelectItem>
+                  <SelectItem value="FQDN">FQDN</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
           
