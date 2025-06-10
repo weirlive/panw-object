@@ -10,7 +10,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ClipboardCopy, ClipboardCheck, TerminalSquare, Settings2, Edit3, PlusSquare, ListPlus, Tag, FileSignature, FilePlus } from 'lucide-react';
+import { ClipboardCopy, ClipboardCheck, TerminalSquare, Settings2, FileSignature, FilePlus, ListPlus, MessageSquare } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 
 type OperationType = 'create' | 'rename';
@@ -19,6 +19,7 @@ export default function PaloAltoForm() {
   const [baseName, setBaseName] = useState<string>('');
   const [objectTag, setObjectTag] = useState<string>('');
   const [objectType, setObjectType] = useState<string>('HST');
+  const [objectDescription, setObjectDescription] = useState<string>('');
   const [operationType, setOperationType] = useState<OperationType>('create');
   const [objectListInput, setObjectListInput] = useState<string>('');
   const [generatedCommands, setGeneratedCommands] = useState<string>('');
@@ -65,14 +66,14 @@ export default function PaloAltoForm() {
 
       let valuePartForNewNameConstruction: string;
       let valuePartForObjectDefinition: string = '';
-      let descriptionForNewObject = trimmedLine;
+      let descriptionForNewObject: string;
       let originalObjectNameForRename: string | undefined = undefined;
       let newName: string;
 
 
       if (operationType === 'rename') {
         originalObjectNameForRename = trimmedLine;
-        valuePartForNewNameConstruction = trimmedLine;
+        valuePartForNewNameConstruction = trimmedLine; // Use the original name to derive the suffix
 
         if (!originalObjectNameForRename.trim()) {
           commandsArray.push(`# Skipping RENAME: Empty original name provided: ${trimmedLine}`);
@@ -80,10 +81,10 @@ export default function PaloAltoForm() {
         }
 
         const sanitizedSuffixForRename = valuePartForNewNameConstruction
-          .replace(/[\/\s-]+/g, '_')
-          .replace(/[^a-zA-Z0-9_.-]/g, '')
-          .replace(/_{2,}/g, '_')
-          .replace(/^_+|_+$/g, '');
+          .replace(/[\/\s-]+/g, '_') // Replace slashes, spaces, hyphens with underscores
+          .replace(/[^a-zA-Z0-9_.-]/g, '') // Remove other special characters, preserving dots
+          .replace(/_{2,}/g, '_') // Collapse multiple underscores
+          .replace(/^_+|_+$/g, ''); // Trim leading/trailing underscores
 
 
         if (!sanitizedSuffixForRename) {
@@ -91,7 +92,7 @@ export default function PaloAltoForm() {
           return;
         }
         newName = `${baseName.trim()}_${objectType}_${sanitizedSuffixForRename}`;
-        descriptionForNewObject = originalObjectNameForRename;
+        descriptionForNewObject = objectDescription.trim() || originalObjectNameForRename;
 
       } else { // Create operation
         valuePartForNewNameConstruction = trimmedLine;
@@ -103,10 +104,10 @@ export default function PaloAltoForm() {
         }
 
         const formattedValuePart = valuePartForNewNameConstruction
-          .replace(/[\/\s-]+/g, '_')
-          .replace(/[^a-zA-Z0-9_.-]/g, '')
-          .replace(/_{2,}/g, '_')
-          .replace(/^_+|_+$/g, '');
+          .replace(/[\/\s-]+/g, '_') // Replace slashes, spaces, hyphens with underscores
+          .replace(/[^a-zA-Z0-9_.-]/g, '') // Remove other special characters, preserving dots
+          .replace(/_{2,}/g, '_') // Collapse multiple underscores
+          .replace(/^_+|_+$/g, ''); // Trim leading/trailing underscores
 
 
         if (!formattedValuePart) {
@@ -114,6 +115,7 @@ export default function PaloAltoForm() {
           return;
         }
         newName = `${baseName.trim()}_${objectType}_${formattedValuePart}`;
+        descriptionForNewObject = objectDescription.trim() || trimmedLine;
       }
 
 
@@ -241,7 +243,7 @@ const renamePlaceholderBase =
 # www.example.com (for FQDN)
 #
 # Paste one value per line.
-# This value will be used for the object and its description.
+# If no custom description is provided above, this value will be used for the object's description.
 # Dots in the value (e.g., in IPs or FQDNs) are preserved in the object name suffix.
 # Other special characters (slashes, spaces, hyphens) become underscores.
 # New name: ZoneName_ObjectType_SanitizedValue
@@ -316,19 +318,37 @@ main.example.com`;
             </div>
           </div>
 
-          <div className="space-y-2">
-              <Label className="font-semibold text-card-foreground/90">Object Type</Label>
-              <Select value={objectType} onValueChange={setObjectType}>
-                <SelectTrigger className="w-full focus:ring-ring">
-                  <SelectValue placeholder="Select object type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="HST">Host (HST)</SelectItem>
-                  <SelectItem value="SBN">Subnet (SBN)</SelectItem>
-                  <SelectItem value="ADR">Address Range (ADR)</SelectItem>
-                  <SelectItem value="FQDN">FQDN</SelectItem>
-                </SelectContent>
-              </Select>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+                <Label htmlFor="objectType" className="font-semibold text-card-foreground/90">Object Type</Label>
+                <Select value={objectType} onValueChange={setObjectType}>
+                  <SelectTrigger id="objectType" className="w-full focus:ring-ring">
+                    <SelectValue placeholder="Select object type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="HST">Host (HST)</SelectItem>
+                    <SelectItem value="SBN">Subnet (SBN)</SelectItem>
+                    <SelectItem value="ADR">Address Range (ADR)</SelectItem>
+                    <SelectItem value="FQDN">FQDN</SelectItem>
+                  </SelectContent>
+                </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="objectDescription" className="font-semibold text-card-foreground/90">
+                Object Description (Optional)
+              </Label>
+              <Input
+                id="objectDescription"
+                type="text"
+                placeholder="e.g., Primary Web Server"
+                value={objectDescription}
+                onChange={(e) => setObjectDescription(e.target.value)}
+                className="focus:ring-ring"
+              />
+               <p className="text-xs text-muted-foreground">
+                If empty, defaults to input value (Create) or original name (Rename).
+              </p>
+            </div>
           </div>
 
 
@@ -458,3 +478,4 @@ main.example.com`;
     </Card>
   );
 }
+
