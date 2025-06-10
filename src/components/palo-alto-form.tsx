@@ -12,7 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ClipboardCopy, ClipboardCheck, TerminalSquare, Settings2, Edit3, PlusSquare, ListPlus, Tag } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 
-type OperationType = 'rename' | 'create';
+type OperationType = 'create' | 'rename';
 
 export default function PaloAltoForm() {
   const [baseName, setBaseName] = useState<string>('');
@@ -76,11 +76,10 @@ export default function PaloAltoForm() {
           return;
         }
 
-        // For rename, derive suffix: preserve dots, replace others with underscore
         const sanitizedSuffixForRename = valuePartForNewNameConstruction
-          .replace(/[\/\s-]+/g, '_') // Replaces slashes, spaces, hyphens with underscores. Dots are preserved.
-          .replace(/_{2,}/g, '_')    // Collapse multiple underscores to a single one.
-          .replace(/^_+|_+$/g, '');  // Remove leading/trailing underscores.
+          .replace(/[\/\s-]+/g, '_')
+          .replace(/_{2,}/g, '_')
+          .replace(/^_+|_+$/g, '');
 
         if (!sanitizedSuffixForRename) {
           commandsArray.push(`# Skipping RENAME: Resulting name part is empty after sanitization for original: ${trimmedLine}`);
@@ -98,11 +97,10 @@ export default function PaloAltoForm() {
              return;
         }
 
-        // For create, format value: preserve dots, replace others with underscore
         const formattedValuePart = valuePartForNewNameConstruction
-          .replace(/[\/\s-]+/g, '_') // Replaces slashes, spaces, hyphens with underscores. Dots are preserved.
-          .replace(/_{2,}/g, '_')    // Collapse multiple underscores to a single one.
-          .replace(/^_+|_+$/g, '');  // Remove leading/trailing underscores.
+          .replace(/[\/\s-]+/g, '_')
+          .replace(/_{2,}/g, '_')
+          .replace(/^_+|_+$/g, '');
 
         if (!formattedValuePart) {
           commandsArray.push(`# Skipping CREATE: Resulting name part is empty after sanitization: ${trimmedLine} (derived from: ${valuePartForNewNameConstruction})`);
@@ -277,7 +275,7 @@ main.example.com`;
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="objectTag" className="font-semibold text-card-foreground/90">Object Tag (Optional, uses Zone Name if empty)</Label>
+              <Label htmlFor="objectTag" className="font-semibold text-card-foreground/90">Object Tag (Optional)</Label>
               <Input
                 id="objectTag"
                 type="text"
@@ -360,7 +358,7 @@ main.example.com`;
               </div>
               <div className="space-y-2">
                 <Label htmlFor="addressGroupTag" className="font-semibold text-card-foreground/90">
-                  Address Group Tag (Optional, uses Zone Name if empty)
+                  Address Group Tag (Optional)
                 </Label>
                 <Input
                   id="addressGroupTag"
