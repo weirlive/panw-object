@@ -5,8 +5,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { ThemeProvider } from "@/components/theme-provider";
 
 export const metadata: Metadata = {
-  title: 'PANW OBJECT TOOL',
-  description: 'Generate Palo Alto CLI commands for renaming and tagging address objects.',
+  title: 'PANW Command Generator',
+  description: 'Generate Palo Alto CLI commands for creating/renaming address entries and address groups.',
 };
 
 export default function RootLayout({

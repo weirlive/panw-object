@@ -10,18 +10,18 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ClipboardCopy, ClipboardCheck, TerminalSquare, Settings2, FileSignature, FilePlus, ListPlus, MessageSquare } from 'lucide-react';
+import { ClipboardCopy, ClipboardCheck, TerminalSquare, Settings2, FileSignature, FilePlus, ListPlus } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 
 type OperationType = 'create' | 'rename';
 
 export default function PaloAltoForm() {
   const [baseName, setBaseName] = useState<string>('');
-  const [objectTag, setObjectTag] = useState<string>('');
-  const [objectType, setObjectType] = useState<string>('HST');
-  const [objectDescription, setObjectDescription] = useState<string>('');
+  const [tagValue, setTagValue] = useState<string>('');
+  const [addressType, setAddressType] = useState<string>('HST');
+  const [descriptionValue, setDescriptionValue] = useState<string>('');
   const [operationType, setOperationType] = useState<OperationType>('create');
-  const [objectListInput, setObjectListInput] = useState<string>('');
+  const [listInput, setListInput] = useState<string>('');
   const [generatedCommands, setGeneratedCommands] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isCopied, setIsCopied] = useState<boolean>(false);
@@ -44,20 +44,20 @@ export default function PaloAltoForm() {
         setIsLoading(false);
         return;
     }
-    if (!objectListInput.trim()) {
+    if (!listInput.trim()) {
         toast({
-            title: "Missing Object List/Values",
-            description: "Please paste your object list or values.",
+            title: "Missing List/Values",
+            description: "Please paste your list or values.",
             variant: "destructive",
         });
         setIsLoading(false);
         return;
     }
 
-    const lines = objectListInput.split('\n');
+    const lines = listInput.split('\n');
     const commandsArray: string[] = [];
-    const objectNamesForGroup: string[] = [];
-    const effectiveObjectTag = objectTag.trim() || baseName.trim();
+    const namesForGroup: string[] = [];
+    const effectiveTag = tagValue.trim() || baseName.trim();
 
 
     lines.forEach(line => {
@@ -65,57 +65,57 @@ export default function PaloAltoForm() {
       if (!trimmedLine) return;
 
       let valuePartForNewNameConstruction: string;
-      let valuePartForObjectDefinition: string = '';
-      let descriptionForNewObject: string;
-      let originalObjectNameForRename: string | undefined = undefined;
+      let valuePartForDefinition: string = '';
+      let descriptionForNewEntry: string;
+      let originalNameForRename: string | undefined = undefined;
       let newName: string;
 
 
       if (operationType === 'rename') {
-        originalObjectNameForRename = trimmedLine;
-        valuePartForNewNameConstruction = trimmedLine; // Use the original name to derive the suffix
+        originalNameForRename = trimmedLine;
+        valuePartForNewNameConstruction = trimmedLine;
 
-        if (!originalObjectNameForRename.trim()) {
+        if (!originalNameForRename.trim()) {
           commandsArray.push(`# Skipping RENAME: Empty original name provided: ${trimmedLine}`);
           return;
         }
-
+        
         const sanitizedSuffixForRename = valuePartForNewNameConstruction
-          .replace(/[\/\s-]+/g, '_') // Replace slashes, spaces, hyphens with underscores
-          .replace(/[^a-zA-Z0-9_.-]/g, '') // Remove other special characters, preserving dots
-          .replace(/_{2,}/g, '_') // Collapse multiple underscores
-          .replace(/^_+|_+$/g, ''); // Trim leading/trailing underscores
+          .replace(/[\/\s-]+/g, '_') 
+          .replace(/[^a-zA-Z0-9_.]/g, '') 
+          .replace(/_{2,}/g, '_') 
+          .replace(/^_+|_+$/g, '');
 
 
         if (!sanitizedSuffixForRename) {
           commandsArray.push(`# Skipping RENAME: Resulting name part is empty after sanitization for original: ${trimmedLine}`);
           return;
         }
-        newName = `${baseName.trim()}_${objectType}_${sanitizedSuffixForRename}`;
-        descriptionForNewObject = objectDescription.trim() || originalObjectNameForRename;
+        newName = `${baseName.trim()}_${addressType}_${sanitizedSuffixForRename}`;
+        descriptionForNewEntry = descriptionValue.trim() || originalNameForRename;
 
       } else { // Create operation
         valuePartForNewNameConstruction = trimmedLine;
-        valuePartForObjectDefinition = trimmedLine;
+        valuePartForDefinition = trimmedLine;
 
-        if (!valuePartForObjectDefinition.trim()) {
+        if (!valuePartForDefinition.trim()) {
              commandsArray.push(`# Skipping CREATE: Empty value provided: ${trimmedLine}`);
              return;
         }
 
         const formattedValuePart = valuePartForNewNameConstruction
-          .replace(/[\/\s-]+/g, '_') // Replace slashes, spaces, hyphens with underscores
-          .replace(/[^a-zA-Z0-9_.-]/g, '') // Remove other special characters, preserving dots
-          .replace(/_{2,}/g, '_') // Collapse multiple underscores
-          .replace(/^_+|_+$/g, ''); // Trim leading/trailing underscores
+          .replace(/[\/\s-]+/g, '_') 
+          .replace(/[^a-zA-Z0-9_.]/g, '')
+          .replace(/_{2,}/g, '_') 
+          .replace(/^_+|_+$/g, '');
 
 
         if (!formattedValuePart) {
           commandsArray.push(`# Skipping CREATE: Resulting name part is empty after sanitization: ${trimmedLine} (derived from: ${valuePartForNewNameConstruction})`);
           return;
         }
-        newName = `${baseName.trim()}_${objectType}_${formattedValuePart}`;
-        descriptionForNewObject = objectDescription.trim() || trimmedLine;
+        newName = `${baseName.trim()}_${addressType}_${formattedValuePart}`;
+        descriptionForNewEntry = descriptionValue.trim() || trimmedLine;
       }
 
 
@@ -123,37 +123,37 @@ export default function PaloAltoForm() {
 
 
       if (operationType === 'rename') {
-        if (!originalObjectNameForRename) {
-             commandsArray.push(`# Skipping RENAME: Could not determine original object name for: ${trimmedLine}`);
+        if (!originalNameForRename) {
+             commandsArray.push(`# Skipping RENAME: Could not determine original name for: ${trimmedLine}`);
              return;
         }
-        commandsArray.push(`rename address ${originalObjectNameForRename} to ${newName}`);
-        commandsArray.push(`set address ${newName} description "${descriptionForNewObject}"`);
-        commandsArray.push(`set address ${newName} tag [ ${effectiveObjectTag} ]\n`);
-        objectNamesForGroup.push(newName);
+        commandsArray.push(`rename address ${originalNameForRename} to ${newName}`);
+        commandsArray.push(`set address ${newName} description "${descriptionForNewEntry}"`);
+        commandsArray.push(`set address ${newName} tag [ ${effectiveTag} ]\n`);
+        namesForGroup.push(newName);
       } else { // create
-        switch (objectType) {
+        switch (addressType) {
           case 'HST':
-            const hostIp = valuePartForObjectDefinition.includes('/') ? valuePartForObjectDefinition : `${valuePartForObjectDefinition}/32`;
+            const hostIp = valuePartForDefinition.includes('/') ? valuePartForDefinition : `${valuePartForDefinition}/32`;
             commandsArray.push(`set address ${newName} ip-netmask ${hostIp}`);
             break;
           case 'SBN':
-            commandsArray.push(`set address ${newName} ip-netmask ${valuePartForObjectDefinition}`);
+            commandsArray.push(`set address ${newName} ip-netmask ${valuePartForDefinition}`);
             break;
           case 'ADR':
-            commandsArray.push(`set address ${newName} ip-range ${valuePartForObjectDefinition}`);
+            commandsArray.push(`set address ${newName} ip-range ${valuePartForDefinition}`);
             break;
           case 'FQDN':
-            commandsArray.push(`set address ${newName} fqdn ${valuePartForObjectDefinition}`);
+            commandsArray.push(`set address ${newName} fqdn ${valuePartForDefinition}`);
             break;
         }
-        commandsArray.push(`set address ${newName} description "${descriptionForNewObject}"`);
-        commandsArray.push(`set address ${newName} tag [ ${effectiveObjectTag} ]\n`);
-        objectNamesForGroup.push(newName);
+        commandsArray.push(`set address ${newName} description "${descriptionForNewEntry}"`);
+        commandsArray.push(`set address ${newName} tag [ ${effectiveTag} ]\n`);
+        namesForGroup.push(newName);
       }
     });
 
-    if (addToGroup && objectNamesForGroup.length > 0) {
+    if (addToGroup && namesForGroup.length > 0) {
       const sanitizedGroupSuffix = addressGroupSuffix.trim().replace(/[.\/\-\s]+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
       const groupNameBase = `${baseName.trim()}_ADG_`;
       const groupName = `${groupNameBase}${sanitizedGroupSuffix ? sanitizedGroupSuffix : ''}`.toUpperCase();
@@ -161,7 +161,7 @@ export default function PaloAltoForm() {
 
 
       commandsArray.push(`\n# Address Group Configuration`);
-      commandsArray.push(`set address-group ${groupName} static [ ${objectNamesForGroup.join(' ')} ]`);
+      commandsArray.push(`set address-group ${groupName} static [ ${namesForGroup.join(' ')} ]`);
       if (!addressGroupSuffix.trim()) {
         commandsArray.push(`set address-group ${groupName} description "Address group for ${baseName.trim().toUpperCase()}"`);
       } else {
@@ -176,7 +176,7 @@ export default function PaloAltoForm() {
     if (commandsArray.length > 0 && commandsArray.some(cmd => !cmd.startsWith('#'))) {
         toast({
             title: "Commands Generated",
-            description: `Your Palo Alto CLI commands are ready.${addToGroup && objectNamesForGroup.length > 0 ? ' Address group configured.' : ''}`,
+            description: `Your Palo Alto CLI commands are ready.${addToGroup && namesForGroup.length > 0 ? ' Address group configured.' : ''}`,
         });
     } else if (commandsArray.every(cmd => cmd.startsWith('#')) && commandsArray.length > 0) {
         toast({
@@ -187,7 +187,7 @@ export default function PaloAltoForm() {
     } else {
          toast({
             title: "No Commands Generated",
-            description: "The object list might be empty or all entries were malformed/empty.",
+            description: "The list might be empty or all entries were malformed/empty.",
             variant: "destructive"
         });
     }
@@ -221,14 +221,14 @@ export default function PaloAltoForm() {
   };
 
 const renamePlaceholderBase =
-`# Examples (Original Object Name, one per line):
+`# Examples (Original Name, one per line):
 # MyExistingServer
 # Corporate_Subnet_Internal
 # old.fqdn.example.com
 # My.Server.IP
 #
-# Paste one original object name per line.
-# The new name will be: ZoneName_ObjectType_SanitizedOriginalName.
+# Paste one original name per line.
+# The new name will be: ZoneName_AddressType_SanitizedOriginalName.
 # Dots (.) in the original name (e.g., in IPs or FQDNs) will be PRESERVED in the SanitizedOriginalName part.
 # Other special characters (slashes, spaces, hyphens) will be replaced with underscores.
 # e.g., original 'old.fqdn.example.com/app' -> suffix part 'old.fqdn.example.com_app'
@@ -243,10 +243,10 @@ const renamePlaceholderBase =
 # www.example.com (for FQDN)
 #
 # Paste one value per line.
-# If no custom description is provided above, this value will be used for the object's description.
-# Dots in the value (e.g., in IPs or FQDNs) are preserved in the object name suffix.
+# If no custom description is provided above, this value will be used for the entry's description.
+# Dots in the value (e.g., in IPs or FQDNs) are preserved in the name suffix.
 # Other special characters (slashes, spaces, hyphens) become underscores.
-# New name: ZoneName_ObjectType_SanitizedValue
+# New name: ZoneName_AddressType_SanitizedValue
 
 1.1.1.1
 10.20.0.0/24
@@ -306,13 +306,13 @@ main.example.com`;
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="objectTag" className="font-semibold text-card-foreground/90">Object Tag (Optional)</Label>
+              <Label htmlFor="tagValue" className="font-semibold text-card-foreground/90">Tag (Optional)</Label>
               <Input
-                id="objectTag"
+                id="tagValue"
                 type="text"
                 placeholder="e.g., CriticalServer"
-                value={objectTag}
-                onChange={(e) => setObjectTag(e.target.value)}
+                value={tagValue}
+                onChange={(e) => setTagValue(e.target.value)}
                 className="focus:ring-ring"
               />
             </div>
@@ -320,10 +320,10 @@ main.example.com`;
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
-                <Label htmlFor="objectType" className="font-semibold text-card-foreground/90">Object Type</Label>
-                <Select value={objectType} onValueChange={setObjectType}>
-                  <SelectTrigger id="objectType" className="w-full focus:ring-ring">
-                    <SelectValue placeholder="Select object type" />
+                <Label htmlFor="addressType" className="font-semibold text-card-foreground/90">Address Type</Label>
+                <Select value={addressType} onValueChange={setAddressType}>
+                  <SelectTrigger id="addressType" className="w-full focus:ring-ring">
+                    <SelectValue placeholder="Select address type" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="HST">Host (HST)</SelectItem>
@@ -334,15 +334,15 @@ main.example.com`;
                 </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="objectDescription" className="font-semibold text-card-foreground/90">
-                Object Description (Optional)
+              <Label htmlFor="descriptionValue" className="font-semibold text-card-foreground/90">
+                Description (Optional)
               </Label>
               <Input
-                id="objectDescription"
+                id="descriptionValue"
                 type="text"
                 placeholder="e.g., Primary Web Server"
-                value={objectDescription}
-                onChange={(e) => setObjectDescription(e.target.value)}
+                value={descriptionValue}
+                onChange={(e) => setDescriptionValue(e.target.value)}
                 className="focus:ring-ring"
               />
                <p className="text-xs text-muted-foreground">
@@ -361,7 +361,7 @@ main.example.com`;
               />
               <Label htmlFor="addToGroup" className="font-semibold text-card-foreground/90 flex items-center">
                 <ListPlus className="mr-2 h-5 w-5 text-primary/80" />
-                Add objects to an Address Group
+                Add to an Address Group
               </Label>
             </div>
           </div>
@@ -401,27 +401,27 @@ main.example.com`;
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="objectList" className="font-semibold text-card-foreground/90">
+            <Label htmlFor="listInput" className="font-semibold text-card-foreground/90">
               {operationType === 'rename'
-                ? 'Object List (Original Object Name, one per line)'
-                : 'Object Values (One value per line)'
+                ? 'List (Original Name, one per line)'
+                : 'Values (One value per line)'
               }
             </Label>
             <Textarea
-              id="objectList"
+              id="listInput"
               placeholder={getPlaceholder()}
-              value={objectListInput}
-              onChange={(e) => setObjectListInput(e.target.value)}
+              value={listInput}
+              onChange={(e) => setListInput(e.target.value)}
               required
               rows={8}
               className="focus:ring-ring font-code text-sm"
             />
             <p className="text-xs text-muted-foreground">
               {operationType === 'rename'
-                ? "Paste one Original Object Name per line. The new name will be `ZoneName_ObjectType_SanitizedOriginalName`. Dots (`.`) in the `SanitizedOriginalName` part (e.g. from IPs or FQDNs in the original name) are preserved. Other special characters (slashes, spaces, hyphens) become underscores."
-                : "Paste one Value per line (e.g., 1.2.3.4 for Host, 10.0.0.0/16 for Subnet). New name: `ZoneName_ObjectType_SanitizedValue`. Dots (`.`) in the `SanitizedValue` part (e.g. from IPs or FQDNs) are preserved. Other special characters (slashes, spaces, hyphens) become underscores."
+                ? "Paste one Original Name per line. The new name will be `ZoneName_AddressType_SanitizedOriginalName`. Dots (`.`) in the `SanitizedOriginalName` part (e.g. from IPs or FQDNs in the original name) are preserved. Other special characters (slashes, spaces, hyphens) become underscores."
+                : "Paste one Value per line (e.g., 1.2.3.4 for Host, 10.0.0.0/16 for Subnet). New name: `ZoneName_AddressType_SanitizedValue`. Dots (`.`) in the `SanitizedValue` part (e.g. from IPs or FQDNs) are preserved. Other special characters (slashes, spaces, hyphens) become underscores."
               }
-              {' '}Value type depends on selected Object Type.
+              {' '}Value type depends on selected Address Type.
             </p>
           </div>
         </CardContent>
