@@ -232,7 +232,7 @@ export default function PaloAltoForm() {
 
 const renamePlaceholderBase =
 `# Paste one original name per line.
-# Example: MyExistingServer
+# Example: MyExistingServer.internal.net
 # The new name will be constructed as: ZoneName_Type_SanitizedOriginalName.
 # Dots (.) in the original name (e.g., in IPs or FQDNs) will be PRESERVED in the SanitizedOriginalName part.
 # Other special characters (slashes, spaces, hyphens) will be replaced with underscores.`;
@@ -245,7 +245,6 @@ const renamePlaceholderBase =
 # Address Range (ADR): 172.16.1.5-172.16.1.20
 # FQDN: www.example.com
 #
-# If no custom description is provided, this value will be used for the entry's description.
 # Dots (.) in the value (e.g., in IPs or FQDNs) are preserved in the name suffix.
 # Other special characters (slashes, spaces, hyphens) become underscores.
 # New name: ZoneName_Type_SanitizedValue
@@ -391,9 +390,6 @@ main.example.com`;
                 onChange={(e) => setDescriptionValue(e.target.value)}
                 className="focus:ring-ring"
               />
-               <p className="text-xs text-muted-foreground">
-                If empty, uses value/original name.
-              </p>
             </div>
           </div>
            <div className="mt-1 space-y-1 pl-1">
