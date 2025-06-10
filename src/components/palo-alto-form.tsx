@@ -10,7 +10,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ClipboardCopy, ClipboardCheck, TerminalSquare, Settings2, FileSignature, FilePlus, ListPlus } from 'lucide-react';
+import { ClipboardCopy, ClipboardCheck, TerminalSquare, Settings2, FileSignature, FilePlus, ListPlus, Tag } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 
 type OperationType = 'create' | 'rename';
@@ -18,6 +18,7 @@ type OperationType = 'create' | 'rename';
 export default function PaloAltoForm() {
   const [baseName, setBaseName] = useState<string>('');
   const [tagValue, setTagValue] = useState<string>('');
+  const [createTagForEntries, setCreateTagForEntries] = useState<boolean>(false);
   const [addressType, setAddressType] = useState<string>('HST');
   const [descriptionValue, setDescriptionValue] = useState<string>('');
   const [operationType, setOperationType] = useState<OperationType>('create');
@@ -28,6 +29,7 @@ export default function PaloAltoForm() {
   const [addToGroup, setAddToGroup] = useState<boolean>(false);
   const [addressGroupSuffix, setAddressGroupSuffix] = useState<string>('');
   const [addressGroupTag, setAddressGroupTag] = useState<string>('');
+  const [createTagForGroup, setCreateTagForGroup] = useState<boolean>(false);
   const { toast } = useToast();
 
   const handleGenerateCommands = (event: FormEvent) => {
@@ -54,12 +56,29 @@ export default function PaloAltoForm() {
         return;
     }
 
-    const lines = listInput.split('\n');
     const commandsArray: string[] = [];
     const namesForGroup: string[] = [];
+    const tagsToCreate = new Set<string>();
     
     const effectiveTag = tagValue.trim() || baseName.trim();
+    const effectiveGroupTag = addressGroupTag.trim() || baseName.trim();
 
+    if (tagValue.trim() && createTagForEntries) {
+      tagsToCreate.add(tagValue.trim());
+    }
+    if (addToGroup && addressGroupTag.trim() && createTagForGroup) {
+      tagsToCreate.add(addressGroupTag.trim());
+    }
+
+    if (tagsToCreate.size > 0) {
+      commandsArray.push(`# Tag Creation Commands`);
+      tagsToCreate.forEach(tag => {
+        commandsArray.push(`set tag ${tag}`);
+      });
+      commandsArray.push(``); 
+    }
+
+    const lines = listInput.split('\n');
 
     lines.forEach(line => {
       const trimmedLine = line.trim();
@@ -167,9 +186,6 @@ export default function PaloAltoForm() {
       const groupNameBase = `${baseName.trim()}_ADG_`;
       const groupName = `${groupNameBase}${sanitizedGroupSuffix ? sanitizedGroupSuffix : ''}`.toUpperCase();
       
-      const effectiveGroupTag = addressGroupTag.trim() || baseName.trim();
-
-
       commandsArray.push(`\n# Address Group Configuration`);
       commandsArray.push(`set address-group ${groupName} static [ ${namesForGroup.join(' ')} ]`);
       if (!addressGroupSuffix.trim()) {
@@ -304,6 +320,7 @@ main.example.com`;
 
 
   const liveExampleName = `${liveZoneNamePart}_${liveTypePart}_${liveExampleSuffix || "[Suffix]"}`;
+  const lines = listInput.split('\n');
 
 
   return (
@@ -362,6 +379,17 @@ main.example.com`;
                 onChange={(e) => setTagValue(e.target.value)}
                 className="focus:ring-ring"
               />
+              <div className="flex items-center space-x-2 pt-1">
+                <Checkbox 
+                  id="createTagForEntries" 
+                  checked={createTagForEntries} 
+                  onCheckedChange={(checked) => setCreateTagForEntries(checked === true)} 
+                  disabled={!tagValue.trim()}
+                />
+                <Label htmlFor="createTagForEntries" className="text-xs font-normal text-muted-foreground">
+                  Create this tag if it doesn't exist
+                </Label>
+              </div>
             </div>
           </div>
 
@@ -448,6 +476,17 @@ main.example.com`;
                   onChange={(e) => setAddressGroupTag(e.target.value)}
                   className="focus:ring-ring"
                 />
+                <div className="flex items-center space-x-2 pt-1">
+                  <Checkbox 
+                    id="createTagForGroup" 
+                    checked={createTagForGroup} 
+                    onCheckedChange={(checked) => setCreateTagForGroup(checked === true)} 
+                    disabled={!addressGroupTag.trim()}
+                  />
+                  <Label htmlFor="createTagForGroup" className="text-xs font-normal text-muted-foreground">
+                    Create this tag if it doesn't exist
+                  </Label>
+                </div>
               </div>
             </div>
           )}
