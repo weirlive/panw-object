@@ -73,14 +73,13 @@ export default function PaloAltoForm() {
 
       if (operationType === 'rename') {
         originalNameForRename = trimmedLine;
-        valuePartForNewNameConstruction = trimmedLine; // Use the original name to derive the suffix
+        valuePartForNewNameConstruction = trimmedLine;
 
         if (!originalNameForRename.trim()) {
           commandsArray.push(`# Skipping RENAME: Empty original name provided: ${trimmedLine}`);
           return;
         }
         
-        // Preserve dots, replace other special chars with underscores for the suffix part
         const sanitizedSuffixForRename = valuePartForNewNameConstruction
           .replace(/[\/\s-]+/g, '_') 
           .replace(/[^a-zA-Z0-9_.]/g, '') 
@@ -104,7 +103,6 @@ export default function PaloAltoForm() {
              return;
         }
 
-        // Preserve dots, replace other special chars with underscores
         const formattedValuePart = valuePartForNewNameConstruction
           .replace(/[\/\s-]+/g, '_') 
           .replace(/[^a-zA-Z0-9_.]/g, '')
@@ -131,7 +129,11 @@ export default function PaloAltoForm() {
         }
         commandsArray.push(`rename address ${originalNameForRename} to ${newName}`);
         commandsArray.push(`set address ${newName} description "${descriptionForNewEntry}"`);
-        commandsArray.push(`set address ${newName} tag [ ${effectiveTag} ]\n`);
+        if (effectiveTag) {
+            commandsArray.push(`set address ${newName} tag [ ${effectiveTag} ]\n`);
+        } else {
+            commandsArray.push(''); // Add a newline if no tag
+        }
         namesForGroup.push(newName);
       } else { // create
         switch (addressType) {
@@ -150,7 +152,11 @@ export default function PaloAltoForm() {
             break;
         }
         commandsArray.push(`set address ${newName} description "${descriptionForNewEntry}"`);
-        commandsArray.push(`set address ${newName} tag [ ${effectiveTag} ]\n`);
+        if (effectiveTag) {
+            commandsArray.push(`set address ${newName} tag [ ${effectiveTag} ]\n`);
+        } else {
+            commandsArray.push(''); // Add a newline if no tag
+        }
         namesForGroup.push(newName);
       }
     });
@@ -169,7 +175,9 @@ export default function PaloAltoForm() {
       } else {
         commandsArray.push(`set address-group ${groupName} description "${addressGroupSuffix.trim()}"`);
       }
-      commandsArray.push(`set address-group ${groupName} tag [ ${effectiveGroupTag} ]`);
+      if (effectiveGroupTag) {
+        commandsArray.push(`set address-group ${groupName} tag [ ${effectiveGroupTag} ]`);
+      }
       commandsArray.push('');
     }
 
@@ -261,6 +269,47 @@ main.example.com`;
 
   const displaySanitizedSuffix = addressGroupSuffix.trim().replace(/[.\/\-\s]+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
 
+  const sanitizeExampleSuffix = (input: string) => {
+    return input
+      .replace(/[\/\s-]+/g, '_') // Replace slashes, spaces, hyphens with underscore
+      .replace(/[^a-zA-Z0-9_.]/g, '') // Remove other special chars except dot
+      .replace(/_{2,}/g, '_') // Replace multiple underscores with single
+      .replace(/^_+|_+$/g, '') // Trim leading/trailing underscores
+      .toUpperCase();
+  };
+
+  const liveZoneNamePart = (baseName.trim() || "[ZoneName]").toUpperCase();
+  const liveTypePart = addressType.toUpperCase();
+  let exampleInputForSuffixHint = "";
+  let liveExampleSuffix = "";
+
+  if (operationType === 'create') {
+    switch (addressType) {
+      case 'HST':
+        exampleInputForSuffixHint = "192.168.1.1";
+        break;
+      case 'SBN':
+        exampleInputForSuffixHint = "10.0.0.0/16";
+        break;
+      case 'ADR':
+        exampleInputForSuffixHint = "1.1.1.5-1.1.1.10";
+        break;
+      case 'FQDN':
+        exampleInputForSuffixHint = "site.example.com";
+        break;
+      default:
+        exampleInputForSuffixHint = "example-value";
+    }
+    liveExampleSuffix = sanitizeExampleSuffix(exampleInputForSuffixHint);
+  } else { // rename
+    exampleInputForSuffixHint = "Original.Name-Example";
+    liveExampleSuffix = sanitizeExampleSuffix(exampleInputForSuffixHint);
+  }
+  if (!liveExampleSuffix && exampleInputForSuffixHint) liveExampleSuffix = "[SANITIZED]";
+
+
+  const liveExampleName = `${liveZoneNamePart}_${liveTypePart}_${liveExampleSuffix || "[Suffix]"}`;
+
 
   return (
     <Card className="w-full shadow-xl bg-card text-card-foreground">
@@ -272,7 +321,10 @@ main.example.com`;
           </div>
           <RadioGroup
             value={operationType}
-            onValueChange={(value) => setOperationType(value as OperationType)}
+            onValueChange={(value) => {
+              setOperationType(value as OperationType);
+              setGeneratedCommands(''); // Clear commands on op type change
+            }}
             className="flex space-x-4"
           >
             <div className="flex items-center space-x-2">
@@ -310,11 +362,14 @@ main.example.com`;
               <Input
                 id="tagValue"
                 type="text"
-                placeholder="e.g., CriticalServer"
+                placeholder="e.g., CriticalServer (uses Zone Name if empty)"
                 value={tagValue}
                 onChange={(e) => setTagValue(e.target.value)}
                 className="focus:ring-ring"
               />
+               <p className="text-xs text-muted-foreground">
+                If empty, uses Zone Name. Case-sensitive.
+              </p>
             </div>
           </div>
 
@@ -345,14 +400,19 @@ main.example.com`;
                 onChange={(e) => setDescriptionValue(e.target.value)}
                 className="focus:ring-ring"
               />
-               <p className="text-xs text-muted-foreground">
-                If empty, defaults to input value (Create) or original name (Rename).
-              </p>
             </div>
+          </div>
+           <div className="mt-1 space-y-1 pl-1">
+            <p className="text-xs text-muted-foreground">
+              Example generated name: <strong className="text-card-foreground/90 font-code">{liveExampleName}</strong>
+            </p>
+            <p className="text-xs text-muted-foreground italic">
+              (Using "{exampleInputForSuffixHint}" as an example {operationType === 'create' ? 'input value' : 'original name'} for the suffix part)
+            </p>
           </div>
 
 
-          <div className="space-y-2">
+          <div className="space-y-2 pt-4">
             <div className="flex items-center space-x-2">
               <Checkbox
                 id="addToGroup"
@@ -381,7 +441,7 @@ main.example.com`;
                   className="focus:ring-ring"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Final group name: {`${(baseName.trim() || "[ZoneName]").toUpperCase()}_ADG_${(displaySanitizedSuffix).toUpperCase()}`}{!displaySanitizedSuffix && <span className="italic">(NO SUFFIX)</span>}
+                  Final group name: <span className="font-code">{`${(baseName.trim() || "[ZoneName]").toUpperCase()}_ADG_${(displaySanitizedSuffix).toUpperCase()}`}</span>{!displaySanitizedSuffix && <span className="italic">(NO SUFFIX)</span>}
                 </p>
               </div>
               <div className="space-y-2">
@@ -391,11 +451,14 @@ main.example.com`;
                 <Input
                   id="addressGroupTag"
                   type="text"
-                  placeholder="e.g., DepartmentTag"
+                  placeholder="e.g., DepartmentTag (uses Zone Name if empty)"
                   value={addressGroupTag}
                   onChange={(e) => setAddressGroupTag(e.target.value)}
                   className="focus:ring-ring"
                 />
+                 <p className="text-xs text-muted-foreground">
+                  If empty, uses Zone Name. Case-sensitive.
+                </p>
               </div>
             </div>
           )}
