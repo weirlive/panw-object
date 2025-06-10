@@ -8,8 +8,9 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ClipboardCopy, ClipboardCheck, TerminalSquare, Settings2, Edit3, PlusSquare, ListPlus, Tag } from 'lucide-react';
+import { ClipboardCopy, ClipboardCheck, TerminalSquare, Settings2, Edit3, PlusSquare, ListPlus, Tag, FileSignature, FilePlus } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 
 type OperationType = 'create' | 'rename';
@@ -57,6 +58,7 @@ export default function PaloAltoForm() {
     const objectNamesForGroup: string[] = [];
     const effectiveObjectTag = objectTag.trim() || baseName.trim();
 
+
     lines.forEach(line => {
       const trimmedLine = line.trim();
       if (!trimmedLine) return;
@@ -66,6 +68,7 @@ export default function PaloAltoForm() {
       let descriptionForNewObject = trimmedLine;
       let originalObjectNameForRename: string | undefined = undefined;
       let newName: string;
+
 
       if (operationType === 'rename') {
         originalObjectNameForRename = trimmedLine;
@@ -78,8 +81,10 @@ export default function PaloAltoForm() {
 
         const sanitizedSuffixForRename = valuePartForNewNameConstruction
           .replace(/[\/\s-]+/g, '_')
+          .replace(/[^a-zA-Z0-9_.-]/g, '')
           .replace(/_{2,}/g, '_')
           .replace(/^_+|_+$/g, '');
+
 
         if (!sanitizedSuffixForRename) {
           commandsArray.push(`# Skipping RENAME: Resulting name part is empty after sanitization for original: ${trimmedLine}`);
@@ -99,8 +104,10 @@ export default function PaloAltoForm() {
 
         const formattedValuePart = valuePartForNewNameConstruction
           .replace(/[\/\s-]+/g, '_')
+          .replace(/[^a-zA-Z0-9_.-]/g, '')
           .replace(/_{2,}/g, '_')
           .replace(/^_+|_+$/g, '');
+
 
         if (!formattedValuePart) {
           commandsArray.push(`# Skipping CREATE: Resulting name part is empty after sanitization: ${trimmedLine} (derived from: ${valuePartForNewNameConstruction})`);
@@ -108,6 +115,7 @@ export default function PaloAltoForm() {
         }
         newName = `${baseName.trim()}_${objectType}_${formattedValuePart}`;
       }
+
 
       newName = newName.toUpperCase();
 
@@ -144,7 +152,7 @@ export default function PaloAltoForm() {
     });
 
     if (addToGroup && objectNamesForGroup.length > 0) {
-      const sanitizedGroupSuffix = addressGroupSuffix.trim().replace(/[.\/\-\s]+/g, '_');
+      const sanitizedGroupSuffix = addressGroupSuffix.trim().replace(/[.\/\-\s]+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
       const groupNameBase = `${baseName.trim()}_ADG_`;
       const groupName = `${groupNameBase}${sanitizedGroupSuffix ? sanitizedGroupSuffix : ''}`.toUpperCase();
       const effectiveGroupTag = addressGroupTag.trim() || baseName.trim();
@@ -219,7 +227,7 @@ const renamePlaceholderBase =
 #
 # Paste one original object name per line.
 # The new name will be: ZoneName_ObjectType_SanitizedOriginalName.
-# Dots (.) in the Original Object Name (e.g., in IPs or FQDNs) will be PRESERVED in the SanitizedOriginalName part.
+# Dots (.) in the original name (e.g., in IPs or FQDNs) will be PRESERVED in the SanitizedOriginalName part.
 # Other special characters (slashes, spaces, hyphens) will be replaced with underscores.
 # e.g., original 'old.fqdn.example.com/app' -> suffix part 'old.fqdn.example.com_app'
 # e.g., original 'My.Server/app' -> suffix part 'My.Server_app'`;
@@ -249,7 +257,8 @@ main.example.com`;
     return createPlaceholder;
   }
 
-  const displaySanitizedSuffix = addressGroupSuffix.trim().replace(/[.\/\-\s]+/g, '_');
+  const displaySanitizedSuffix = addressGroupSuffix.trim().replace(/[.\/\-\s]+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
+
 
   return (
     <Card className="w-full shadow-xl bg-card text-card-foreground">
@@ -279,7 +288,7 @@ main.example.com`;
               <Input
                 id="objectTag"
                 type="text"
-                placeholder="e.g., CriticalServer (uses Zone Name if empty)"
+                placeholder="e.g., CriticalServer"
                 value={objectTag}
                 onChange={(e) => setObjectTag(e.target.value)}
                 className="focus:ring-ring"
@@ -287,28 +296,30 @@ main.example.com`;
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <Label className="font-semibold text-card-foreground/90">Type</Label>
-              <Select value={operationType} onValueChange={(value) => setOperationType(value as OperationType)}>
-                <SelectTrigger className="w-full focus:ring-ring">
-                  <SelectValue placeholder="Select operation type" />
-                </SelectTrigger>
-                <SelectContent>
-                   <SelectItem value="create">
-                     <div className="flex items-center">
-                      <PlusSquare className="mr-2 h-4 w-4 text-primary/80" /> Create
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="rename">
-                    <div className="flex items-center">
-                      <Edit3 className="mr-2 h-4 w-4 text-primary/80" /> Rename
-                    </div>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
+           <div className="space-y-2">
+            <Label className="font-semibold text-card-foreground/90">Operation Type</Label>
+            <RadioGroup
+              value={operationType}
+              onValueChange={(value) => setOperationType(value as OperationType)}
+              className="flex space-x-4"
+            >
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="create" id="r_create" />
+                <Label htmlFor="r_create" className="flex items-center">
+                  <FilePlus className="mr-2 h-4 w-4 text-primary/80" /> Create
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="rename" id="r_rename" />
+                <Label htmlFor="r_rename" className="flex items-center">
+                  <FileSignature className="mr-2 h-4 w-4 text-primary/80" /> Rename
+                </Label>
+              </div>
+            </RadioGroup>
+          </div>
+
+
+          <div className="space-y-2">
               <Label className="font-semibold text-card-foreground/90">Object Type</Label>
               <Select value={objectType} onValueChange={setObjectType}>
                 <SelectTrigger className="w-full focus:ring-ring">
@@ -321,8 +332,8 @@ main.example.com`;
                   <SelectItem value="FQDN">FQDN</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
           </div>
+
 
           <div className="space-y-2">
             <div className="flex items-center space-x-2">
@@ -363,7 +374,7 @@ main.example.com`;
                 <Input
                   id="addressGroupTag"
                   type="text"
-                  placeholder="e.g., DepartmentTag (uses Zone Name if empty)"
+                  placeholder="e.g., DepartmentTag"
                   value={addressGroupTag}
                   onChange={(e) => setAddressGroupTag(e.target.value)}
                   className="focus:ring-ring"
@@ -450,3 +461,4 @@ main.example.com`;
     </Card>
   );
 }
+
