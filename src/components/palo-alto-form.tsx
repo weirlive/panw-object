@@ -57,6 +57,7 @@ export default function PaloAltoForm() {
     const lines = listInput.split('\n');
     const commandsArray: string[] = [];
     const namesForGroup: string[] = [];
+    
     const effectiveTag = tagValue.trim() || baseName.trim();
 
 
@@ -165,6 +166,7 @@ export default function PaloAltoForm() {
       const sanitizedGroupSuffix = addressGroupSuffix.trim().replace(/[.\/\-\s]+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
       const groupNameBase = `${baseName.trim()}_ADG_`;
       const groupName = `${groupNameBase}${sanitizedGroupSuffix ? sanitizedGroupSuffix : ''}`.toUpperCase();
+      
       const effectiveGroupTag = addressGroupTag.trim() || baseName.trim();
 
 
@@ -394,7 +396,7 @@ main.example.com`;
           </div>
            <div className="mt-1 space-y-1 pl-1">
             <p className="text-xs text-muted-foreground">
-              Example generated name: <strong className="text-card-foreground/90 font-code">{liveExampleName}</strong>
+              Example: <strong className="text-card-foreground/90 font-code">{liveExampleName}</strong>
             </p>
             <p className="text-xs text-muted-foreground italic">
               (Using "{exampleInputForSuffixHint}" as an example {operationType === 'create' ? 'input value' : 'original name'} for the suffix part)
@@ -521,3 +523,5 @@ main.example.com`;
     </Card>
   );
 }
+
+    
