@@ -8,7 +8,7 @@ export default function Home() {
       <div className="w-full max-w-2xl">
         <header className="text-center mb-8 relative">
           <h1 className="font-headline text-4xl sm:text-5xl font-bold text-primary">
-            PANW Command Generator
+            PANW Objects
           </h1>
           <div className="absolute top-0 right-0">
             <ThemeToggleButton />
