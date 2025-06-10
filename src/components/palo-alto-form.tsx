@@ -6,17 +6,17 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from "@/components/ui/checkbox";
-import { ClipboardCopy, ClipboardCheck, TerminalSquare, Settings2, Edit3, PlusSquare, ListPlus } from 'lucide-react';
+import { ClipboardCopy, ClipboardCheck, TerminalSquare, Settings2, Edit3, PlusSquare, ListPlus, Tag } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 
 type OperationType = 'rename' | 'create';
 
 export default function PaloAltoForm() {
   const [baseName, setBaseName] = useState<string>('');
-  const [tag, setTag] = useState<string>('');
+  const [objectTag, setObjectTag] = useState<string>('');
   const [objectType, setObjectType] = useState<string>('HST');
   const [operationType, setOperationType] = useState<OperationType>('create');
   const [objectListInput, setObjectListInput] = useState<string>('');
@@ -25,6 +25,7 @@ export default function PaloAltoForm() {
   const [isCopied, setIsCopied] = useState<boolean>(false);
   const [addToGroup, setAddToGroup] = useState<boolean>(false);
   const [addressGroupSuffix, setAddressGroupSuffix] = useState<string>('');
+  const [addressGroupTag, setAddressGroupTag] = useState<string>('');
   const { toast } = useToast();
 
   const handleGenerateCommands = (event: FormEvent) => {
@@ -54,7 +55,7 @@ export default function PaloAltoForm() {
     const lines = objectListInput.split('\n');
     const commandsArray: string[] = [];
     const objectNamesForGroup: string[] = [];
-    const effectiveTag = tag.trim() || baseName.trim();
+    const effectiveObjectTag = objectTag.trim() || baseName.trim();
 
     lines.forEach(line => {
       const trimmedLine = line.trim();
@@ -64,7 +65,7 @@ export default function PaloAltoForm() {
       let valuePartForObjectDefinition: string = '';
       let descriptionForNewObject = trimmedLine;
       let originalObjectNameForRename: string | undefined = undefined;
-
+      let newName: string;
 
       if (operationType === 'rename') {
         originalObjectNameForRename = trimmedLine;
@@ -74,6 +75,20 @@ export default function PaloAltoForm() {
           commandsArray.push(`# Skipping RENAME: Empty original name provided: ${trimmedLine}`);
           return;
         }
+
+        // For rename, derive suffix: preserve dots, replace others with underscore
+        const sanitizedSuffixForRename = valuePartForNewNameConstruction
+          .replace(/[\/\s-]+/g, '_') // Replaces slashes, spaces, hyphens with underscores. Dots are preserved.
+          .replace(/_{2,}/g, '_')    // Collapse multiple underscores to a single one.
+          .replace(/^_+|_+$/g, '');  // Remove leading/trailing underscores.
+
+        if (!sanitizedSuffixForRename) {
+          commandsArray.push(`# Skipping RENAME: Resulting name part is empty after sanitization for original: ${trimmedLine}`);
+          return;
+        }
+        newName = `${baseName.trim()}_${objectType}_${sanitizedSuffixForRename}`;
+        descriptionForNewObject = originalObjectNameForRename;
+
       } else { // Create operation
         valuePartForNewNameConstruction = trimmedLine;
         valuePartForObjectDefinition = trimmedLine;
@@ -82,27 +97,20 @@ export default function PaloAltoForm() {
              commandsArray.push(`# Skipping CREATE: Empty value provided: ${trimmedLine}`);
              return;
         }
+
+        // For create, format value: preserve dots, replace others with underscore
+        const formattedValuePart = valuePartForNewNameConstruction
+          .replace(/[\/\s-]+/g, '_') // Replaces slashes, spaces, hyphens with underscores. Dots are preserved.
+          .replace(/_{2,}/g, '_')    // Collapse multiple underscores to a single one.
+          .replace(/^_+|_+$/g, '');  // Remove leading/trailing underscores.
+
+        if (!formattedValuePart) {
+          commandsArray.push(`# Skipping CREATE: Resulting name part is empty after sanitization: ${trimmedLine} (derived from: ${valuePartForNewNameConstruction})`);
+          return;
+        }
+        newName = `${baseName.trim()}_${objectType}_${formattedValuePart}`;
       }
 
-      let newName: string;
-      let sanitizedValuePart: string;
-
-
-      // Sanitize valuePartForNewNameConstruction to create the suffix of the new object name.
-      // Preserve dots ('.') for IPs/FQDNs, replace other separators with underscores.
-      sanitizedValuePart = valuePartForNewNameConstruction
-        .replace(/[\/\s-]+/g, '_') // Replaces slashes, spaces, hyphens with underscores. Dots are preserved.
-        .replace(/_{2,}/g, '_')    // Collapse multiple underscores to a single one.
-        .replace(/^_+|_+$/g, '');  // Remove leading/trailing underscores.
-
-
-      if (!sanitizedValuePart) {
-        const actionType = operationType === 'create' ? 'CREATE' : 'RENAME';
-        commandsArray.push(`# Skipping ${actionType}: Resulting name part is empty after sanitization: ${trimmedLine} (derived from: ${valuePartForNewNameConstruction})`);
-        return;
-      }
-
-      newName = `${baseName.trim()}_${objectType}_${sanitizedValuePart}`;
       newName = newName.toUpperCase();
 
 
@@ -111,10 +119,9 @@ export default function PaloAltoForm() {
              commandsArray.push(`# Skipping RENAME: Could not determine original object name for: ${trimmedLine}`);
              return;
         }
-        descriptionForNewObject = originalObjectNameForRename; // Use original name as description for renamed object
         commandsArray.push(`rename address ${originalObjectNameForRename} to ${newName}`);
         commandsArray.push(`set address ${newName} description "${descriptionForNewObject}"`);
-        commandsArray.push(`set address ${newName} tag [ ${effectiveTag} ]\n`);
+        commandsArray.push(`set address ${newName} tag [ ${effectiveObjectTag} ]\n`);
         objectNamesForGroup.push(newName);
       } else { // create
         switch (objectType) {
@@ -133,7 +140,7 @@ export default function PaloAltoForm() {
             break;
         }
         commandsArray.push(`set address ${newName} description "${descriptionForNewObject}"`);
-        commandsArray.push(`set address ${newName} tag [ ${effectiveTag} ]\n`);
+        commandsArray.push(`set address ${newName} tag [ ${effectiveObjectTag} ]\n`);
         objectNamesForGroup.push(newName);
       }
     });
@@ -142,6 +149,8 @@ export default function PaloAltoForm() {
       const sanitizedGroupSuffix = addressGroupSuffix.trim().replace(/[.\/\-\s]+/g, '_');
       const groupNameBase = `${baseName.trim()}_ADG_`;
       const groupName = `${groupNameBase}${sanitizedGroupSuffix ? sanitizedGroupSuffix : ''}`.toUpperCase();
+      const effectiveGroupTag = addressGroupTag.trim() || baseName.trim();
+
 
       commandsArray.push(`\n# Address Group Configuration`);
       commandsArray.push(`set address-group ${groupName} static [ ${objectNamesForGroup.join(' ')} ]`);
@@ -150,6 +159,7 @@ export default function PaloAltoForm() {
       } else {
         commandsArray.push(`set address-group ${groupName} description "${addressGroupSuffix.trim()}"`);
       }
+      commandsArray.push(`set address-group ${groupName} tag [ ${effectiveGroupTag} ]`);
       commandsArray.push('');
     }
 
@@ -213,7 +223,7 @@ const renamePlaceholderBase =
 # The new name will be: ZoneName_ObjectType_SanitizedOriginalName.
 # Dots (.) in the Original Object Name (e.g., in IPs or FQDNs) will be PRESERVED in the SanitizedOriginalName part.
 # Other special characters (slashes, spaces, hyphens) will be replaced with underscores.
-# e.g., original 'old.fqdn.example.com' -> suffix part 'old.fqdn.example.com'
+# e.g., original 'old.fqdn.example.com/app' -> suffix part 'old.fqdn.example.com_app'
 # e.g., original 'My.Server/app' -> suffix part 'My.Server_app'`;
 
 
@@ -267,13 +277,13 @@ main.example.com`;
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="tag" className="font-semibold text-card-foreground/90">Tag (Optional, uses Zone Name if empty)</Label>
+              <Label htmlFor="objectTag" className="font-semibold text-card-foreground/90">Object Tag (Optional, uses Zone Name if empty)</Label>
               <Input
-                id="tag"
+                id="objectTag"
                 type="text"
                 placeholder="e.g., CriticalServer (uses Zone Name if empty)"
-                value={tag}
-                onChange={(e) => setTag(e.target.value)}
+                value={objectTag}
+                onChange={(e) => setObjectTag(e.target.value)}
                 className="focus:ring-ring"
               />
             </div>
@@ -331,21 +341,36 @@ main.example.com`;
           </div>
 
           {addToGroup && (
-            <div className="space-y-2 pl-7">
-              <Label htmlFor="addressGroupSuffix" className="font-semibold text-card-foreground/90">
-                Address Group Name Suffix (Optional)
-              </Label>
-              <Input
-                id="addressGroupSuffix"
-                type="text"
-                placeholder="e.g., WebServers (ZoneName_ADG_WEBSERVERS)"
-                value={addressGroupSuffix}
-                onChange={(e) => setAddressGroupSuffix(e.target.value)}
-                className="focus:ring-ring"
-              />
-              <p className="text-xs text-muted-foreground">
-                Final group name: {`${(baseName.trim() || "[ZoneName]").toUpperCase()}_ADG_${(displaySanitizedSuffix).toUpperCase()}`}{!displaySanitizedSuffix && <span className="italic">(NO SUFFIX)</span>}
-              </p>
+            <div className="space-y-4 pl-7">
+              <div className="space-y-2">
+                <Label htmlFor="addressGroupSuffix" className="font-semibold text-card-foreground/90">
+                  Address Group Name Suffix (Optional)
+                </Label>
+                <Input
+                  id="addressGroupSuffix"
+                  type="text"
+                  placeholder="e.g., WebServers (ZoneName_ADG_WEBSERVERS)"
+                  value={addressGroupSuffix}
+                  onChange={(e) => setAddressGroupSuffix(e.target.value)}
+                  className="focus:ring-ring"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Final group name: {`${(baseName.trim() || "[ZoneName]").toUpperCase()}_ADG_${(displaySanitizedSuffix).toUpperCase()}`}{!displaySanitizedSuffix && <span className="italic">(NO SUFFIX)</span>}
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="addressGroupTag" className="font-semibold text-card-foreground/90">
+                  Address Group Tag (Optional, uses Zone Name if empty)
+                </Label>
+                <Input
+                  id="addressGroupTag"
+                  type="text"
+                  placeholder="e.g., DepartmentTag (uses Zone Name if empty)"
+                  value={addressGroupTag}
+                  onChange={(e) => setAddressGroupTag(e.target.value)}
+                  className="focus:ring-ring"
+                />
+              </div>
             </div>
           )}
 
@@ -427,4 +452,3 @@ main.example.com`;
     </Card>
   );
 }
-
