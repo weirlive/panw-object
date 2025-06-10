@@ -132,7 +132,7 @@ export default function PaloAltoForm() {
         if (effectiveTag) {
             commandsArray.push(`set address ${newName} tag [ ${effectiveTag} ]\n`);
         } else {
-            commandsArray.push(''); // Add a newline if no tag
+            commandsArray.push(''); 
         }
         namesForGroup.push(newName);
       } else { // create
@@ -155,7 +155,7 @@ export default function PaloAltoForm() {
         if (effectiveTag) {
             commandsArray.push(`set address ${newName} tag [ ${effectiveTag} ]\n`);
         } else {
-            commandsArray.push(''); // Add a newline if no tag
+            commandsArray.push(''); 
         }
         namesForGroup.push(newName);
       }
@@ -231,28 +231,22 @@ export default function PaloAltoForm() {
   };
 
 const renamePlaceholderBase =
-`# Examples (Original Name, one per line):
-# MyExistingServer
-# Corporate_Subnet_Internal
-# old.fqdn.example.com
-# My.Server.IP
-#
-# Paste one original name per line.
-# The new name will be: ZoneName_Type_SanitizedOriginalName.
+`# Paste one original name per line.
+# Example: MyExistingServer
+# The new name will be constructed as: ZoneName_Type_SanitizedOriginalName.
 # Dots (.) in the original name (e.g., in IPs or FQDNs) will be PRESERVED in the SanitizedOriginalName part.
 # Other special characters (slashes, spaces, hyphens) will be replaced with underscores.`;
 
 
   const createPlaceholder =
-`# Examples (one actual value per line):
-# 192.168.1.10 (for Host)
-# 10.10.0.0/16 (for Subnet)
-# 172.16.1.5-172.16.1.20 (for Address Range)
-# www.example.com (for FQDN)
+`# Paste one value per line. Example value types:
+# Host (HST): 192.168.1.10
+# Subnet (SBN): 10.10.0.0/16
+# Address Range (ADR): 172.16.1.5-172.16.1.20
+# FQDN: www.example.com
 #
-# Paste one value per line.
-# If no custom description is provided above, this value will be used for the entry's description.
-# Dots in the value (e.g., in IPs or FQDNs) are preserved in the name suffix.
+# If no custom description is provided, this value will be used for the entry's description.
+# Dots (.) in the value (e.g., in IPs or FQDNs) are preserved in the name suffix.
 # Other special characters (slashes, spaces, hyphens) become underscores.
 # New name: ZoneName_Type_SanitizedValue
 
@@ -271,10 +265,10 @@ main.example.com`;
 
   const sanitizeExampleSuffix = (input: string) => {
     return input
-      .replace(/[\/\s-]+/g, '_') // Replace slashes, spaces, hyphens with underscore
-      .replace(/[^a-zA-Z0-9_.]/g, '') // Remove other special chars except dot
-      .replace(/_{2,}/g, '_') // Replace multiple underscores with single
-      .replace(/^_+|_+$/g, '') // Trim leading/trailing underscores
+      .replace(/[\/\s-]+/g, '_') 
+      .replace(/[^a-zA-Z0-9_.]/g, '') 
+      .replace(/_{2,}/g, '_') 
+      .replace(/^_+|_+$/g, '') 
       .toUpperCase();
   };
 
@@ -323,7 +317,7 @@ main.example.com`;
             value={operationType}
             onValueChange={(value) => {
               setOperationType(value as OperationType);
-              setGeneratedCommands(''); // Clear commands on op type change
+              setGeneratedCommands(''); 
             }}
             className="flex space-x-4"
           >
@@ -362,14 +356,11 @@ main.example.com`;
               <Input
                 id="tagValue"
                 type="text"
-                placeholder="e.g., CriticalServer (uses Zone Name if empty)"
+                placeholder="e.g., CriticalServer"
                 value={tagValue}
                 onChange={(e) => setTagValue(e.target.value)}
                 className="focus:ring-ring"
               />
-               <p className="text-xs text-muted-foreground">
-                If empty, uses Zone Name. Case-sensitive.
-              </p>
             </div>
           </div>
 
@@ -400,6 +391,9 @@ main.example.com`;
                 onChange={(e) => setDescriptionValue(e.target.value)}
                 className="focus:ring-ring"
               />
+               <p className="text-xs text-muted-foreground">
+                If empty, uses value/original name.
+              </p>
             </div>
           </div>
            <div className="mt-1 space-y-1 pl-1">
@@ -451,14 +445,11 @@ main.example.com`;
                 <Input
                   id="addressGroupTag"
                   type="text"
-                  placeholder="e.g., DepartmentTag (uses Zone Name if empty)"
+                  placeholder="e.g., DepartmentTag"
                   value={addressGroupTag}
                   onChange={(e) => setAddressGroupTag(e.target.value)}
                   className="focus:ring-ring"
                 />
-                 <p className="text-xs text-muted-foreground">
-                  If empty, uses Zone Name. Case-sensitive.
-                </p>
               </div>
             </div>
           )}
