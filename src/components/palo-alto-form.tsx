@@ -73,13 +73,14 @@ export default function PaloAltoForm() {
 
       if (operationType === 'rename') {
         originalNameForRename = trimmedLine;
-        valuePartForNewNameConstruction = trimmedLine;
+        valuePartForNewNameConstruction = trimmedLine; // Use the original name to derive the suffix
 
         if (!originalNameForRename.trim()) {
           commandsArray.push(`# Skipping RENAME: Empty original name provided: ${trimmedLine}`);
           return;
         }
         
+        // Preserve dots, replace other special chars with underscores for the suffix part
         const sanitizedSuffixForRename = valuePartForNewNameConstruction
           .replace(/[\/\s-]+/g, '_') 
           .replace(/[^a-zA-Z0-9_.]/g, '') 
@@ -103,6 +104,7 @@ export default function PaloAltoForm() {
              return;
         }
 
+        // Preserve dots, replace other special chars with underscores
         const formattedValuePart = valuePartForNewNameConstruction
           .replace(/[\/\s-]+/g, '_') 
           .replace(/[^a-zA-Z0-9_.]/g, '')
@@ -176,7 +178,7 @@ export default function PaloAltoForm() {
     if (commandsArray.length > 0 && commandsArray.some(cmd => !cmd.startsWith('#'))) {
         toast({
             title: "Commands Generated",
-            description: `Your Palo Alto CLI commands are ready.${addToGroup && namesForGroup.length > 0 ? ' Address group configured.' : ''}`,
+            description: `Your CLI commands are ready.${addToGroup && namesForGroup.length > 0 ? ' Address group configured.' : ''}`,
         });
     } else if (commandsArray.every(cmd => cmd.startsWith('#')) && commandsArray.length > 0) {
         toast({
@@ -228,11 +230,9 @@ const renamePlaceholderBase =
 # My.Server.IP
 #
 # Paste one original name per line.
-# The new name will be: ZoneName_AddressType_SanitizedOriginalName.
+# The new name will be: ZoneName_Type_SanitizedOriginalName.
 # Dots (.) in the original name (e.g., in IPs or FQDNs) will be PRESERVED in the SanitizedOriginalName part.
-# Other special characters (slashes, spaces, hyphens) will be replaced with underscores.
-# e.g., original 'old.fqdn.example.com/app' -> suffix part 'old.fqdn.example.com_app'
-# e.g., original 'My.Server/app' -> suffix part 'My.Server_app'`;
+# Other special characters (slashes, spaces, hyphens) will be replaced with underscores.`;
 
 
   const createPlaceholder =
@@ -246,7 +246,7 @@ const renamePlaceholderBase =
 # If no custom description is provided above, this value will be used for the entry's description.
 # Dots in the value (e.g., in IPs or FQDNs) are preserved in the name suffix.
 # Other special characters (slashes, spaces, hyphens) become underscores.
-# New name: ZoneName_AddressType_SanitizedValue
+# New name: ZoneName_Type_SanitizedValue
 
 1.1.1.1
 10.20.0.0/24
@@ -320,10 +320,10 @@ main.example.com`;
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
-                <Label htmlFor="addressType" className="font-semibold text-card-foreground/90">Address Type</Label>
+                <Label htmlFor="addressType" className="font-semibold text-card-foreground/90">Type</Label>
                 <Select value={addressType} onValueChange={setAddressType}>
                   <SelectTrigger id="addressType" className="w-full focus:ring-ring">
-                    <SelectValue placeholder="Select address type" />
+                    <SelectValue placeholder="Select type" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="HST">Host (HST)</SelectItem>
@@ -416,13 +416,6 @@ main.example.com`;
               rows={8}
               className="focus:ring-ring font-code text-sm"
             />
-            <p className="text-xs text-muted-foreground">
-              {operationType === 'rename'
-                ? "Paste one Original Name per line. The new name will be `ZoneName_AddressType_SanitizedOriginalName`. Dots (`.`) in the `SanitizedOriginalName` part (e.g. from IPs or FQDNs in the original name) are preserved. Other special characters (slashes, spaces, hyphens) become underscores."
-                : "Paste one Value per line (e.g., 1.2.3.4 for Host, 10.0.0.0/16 for Subnet). New name: `ZoneName_AddressType_SanitizedValue`. Dots (`.`) in the `SanitizedValue` part (e.g. from IPs or FQDNs) are preserved. Other special characters (slashes, spaces, hyphens) become underscores."
-              }
-              {' '}Value type depends on selected Address Type.
-            </p>
           </div>
         </CardContent>
         <CardFooter className="flex flex-col sm:flex-row justify-between items-center pt-6 border-t">
@@ -478,4 +471,3 @@ main.example.com`;
     </Card>
   );
 }
-
