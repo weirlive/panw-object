@@ -263,9 +263,29 @@ main.example.com`;
   return (
     <Card className="w-full shadow-xl bg-card text-card-foreground">
       <CardHeader>
-        <div className="flex items-center space-x-2 mb-2">
-          <Settings2 className="h-6 w-6 text-primary" />
-          <CardTitle className="font-headline text-2xl text-primary">Configuration</CardTitle>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <Settings2 className="h-6 w-6 text-primary" />
+            <CardTitle className="font-headline text-2xl text-primary">Configuration</CardTitle>
+          </div>
+          <RadioGroup
+            value={operationType}
+            onValueChange={(value) => setOperationType(value as OperationType)}
+            className="flex space-x-4"
+          >
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="create" id="r_create" />
+              <Label htmlFor="r_create" className="flex items-center text-sm">
+                <FilePlus className="mr-2 h-4 w-4 text-primary/80" /> Create
+              </Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="rename" id="r_rename" />
+              <Label htmlFor="r_rename" className="flex items-center text-sm">
+                <FileSignature className="mr-2 h-4 w-4 text-primary/80" /> Rename
+              </Label>
+            </div>
+          </RadioGroup>
         </div>
       </CardHeader>
       <form onSubmit={handleGenerateCommands}>
@@ -295,29 +315,6 @@ main.example.com`;
               />
             </div>
           </div>
-
-           <div className="space-y-2">
-            <Label className="font-semibold text-card-foreground/90">Operation Type</Label>
-            <RadioGroup
-              value={operationType}
-              onValueChange={(value) => setOperationType(value as OperationType)}
-              className="flex space-x-4"
-            >
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="create" id="r_create" />
-                <Label htmlFor="r_create" className="flex items-center">
-                  <FilePlus className="mr-2 h-4 w-4 text-primary/80" /> Create
-                </Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="rename" id="r_rename" />
-                <Label htmlFor="r_rename" className="flex items-center">
-                  <FileSignature className="mr-2 h-4 w-4 text-primary/80" /> Rename
-                </Label>
-              </div>
-            </RadioGroup>
-          </div>
-
 
           <div className="space-y-2">
               <Label className="font-semibold text-card-foreground/90">Object Type</Label>
@@ -461,4 +458,3 @@ main.example.com`;
     </Card>
   );
 }
-
