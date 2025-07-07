@@ -182,7 +182,7 @@ export default function PaloAltoForm() {
     });
 
     if (addToGroup && namesForGroup.length > 0) {
-      const sanitizedGroupSuffix = addressGroupSuffix.trim().replace(/[.\/\-\s]+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
+      const sanitizedGroupSuffix = addressGroupSuffix.trim().replace(/[.\/\s]+/g, '_').replace(/[^a-zA-Z0-9_-]/g, '');
       const groupNameBase = `${baseName.trim()}_ADG_`;
       const groupName = `${groupNameBase}${sanitizedGroupSuffix ? sanitizedGroupSuffix : ''}`.toUpperCase();
       
@@ -278,7 +278,7 @@ main.example.com`;
     return createPlaceholder;
   }
 
-  const displaySanitizedSuffix = addressGroupSuffix.trim().replace(/[.\/\-\s]+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
+  const displaySanitizedSuffix = addressGroupSuffix.trim().replace(/[.\/\s]+/g, '_').replace(/[^a-zA-Z0-9_-]/g, '');
 
   const sanitizeExampleSuffix = (input: string) => {
     return input
