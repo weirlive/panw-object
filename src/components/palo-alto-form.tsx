@@ -562,5 +562,3 @@ main.example.com`;
     </Card>
   );
 }
-
-    
