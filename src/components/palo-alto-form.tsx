@@ -7,10 +7,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ClipboardCopy, ClipboardCheck, TerminalSquare, Settings2, FileSignature, FilePlus, ListPlus, Tag } from 'lucide-react';
+import { ClipboardCopy, ClipboardCheck, TerminalSquare, Settings2, FileSignature, FilePlus, ListPlus, Wand2 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 
 type OperationType = 'create' | 'rename';
@@ -19,7 +18,6 @@ export default function PaloAltoForm() {
   const [baseName, setBaseName] = useState<string>('');
   const [tagValue, setTagValue] = useState<string>('');
   const [createTagForEntries, setCreateTagForEntries] = useState<boolean>(false);
-  const [addressType, setAddressType] = useState<string>('AUTO');
   const [descriptionValue, setDescriptionValue] = useState<string>('');
   const [operationType, setOperationType] = useState<OperationType>('create');
   const [listInput, setListInput] = useState<string>('');
@@ -79,6 +77,7 @@ export default function PaloAltoForm() {
     }
 
     const lines = listInput.split('\n');
+    const ipRegex = /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/;
 
     lines.forEach(line => {
       const trimmedLine = line.trim();
@@ -89,24 +88,22 @@ export default function PaloAltoForm() {
       let descriptionForNewEntry: string;
       let originalNameForRename: string | undefined = undefined;
       let newName: string;
-      let currentAddressType = addressType;
+      let currentAddressType: string = 'FQDN'; // Default for create
 
-      if (operationType === 'create' && addressType === 'AUTO') {
-        if (trimmedLine.includes('/')) {
-          currentAddressType = 'SBN';
-        } else {
-          // Basic check if it looks like an IP, can be improved.
-          // This regex is a simple check and might not cover all edge cases.
-          const ipRegex = /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/;
-          if(ipRegex.test(trimmedLine)) {
+      if (operationType === 'create') {
+        if (trimmedLine.includes('-')) {
+            currentAddressType = 'ADR';
+        } else if (trimmedLine.includes('/')) {
+            currentAddressType = 'SBN';
+        } else if (ipRegex.test(trimmedLine)) {
             currentAddressType = 'HST';
-          } else {
-             // If it's not a subnet and doesn't look like a plain IP, maybe it's an FQDN or range?
-             // For now, let's treat it as a skip, or you could default to FQDN
-             commandsArray.push(`# Skipping auto-detect for value: "${trimmedLine}". Not a clear Host/Subnet. Please select a specific type.`);
-             return;
-          }
+        } else {
+            currentAddressType = 'FQDN'; // Default for non-IP/Subnet/Range
         }
+      } else { // For rename, we can't detect type, so we let the user know.
+          // For simplicity, we'll use a generic placeholder or ask user for type in future.
+          // For now, let's use a generic 'OBJ' for rename operations.
+          currentAddressType = 'OBJ';
       }
 
 
@@ -201,7 +198,7 @@ export default function PaloAltoForm() {
     });
 
     if (addToGroup && namesForGroup.length > 0) {
-      const sanitizedGroupSuffix = addressGroupSuffix.trim().replace(/[.\/\s]+/g, '_').replace(/[^a-zA-Z0-9_-]/g, '');
+      const sanitizedGroupSuffix = addressGroupSuffix.trim().replace(/[\/\s]+/g, '_').replace(/[^a-zA-Z0-9_-]/g, '');
       const groupNameBase = `${baseName.trim()}_ADG_`;
       const groupName = `${groupNameBase}${sanitizedGroupSuffix ? sanitizedGroupSuffix : ''}`.toUpperCase();
       
@@ -270,26 +267,27 @@ export default function PaloAltoForm() {
 const renamePlaceholderBase =
 `# Paste one original name per line.
 # Example: MyExistingServer.internal.net
-# The new name will be constructed as: ZoneName_Type_SanitizedOriginalName.
-# Dots (.) in the original name (e.g., in IPs or FQDNs) will be PRESERVED in the SanitizedOriginalName part.
+# The new name will be constructed as: ZoneName_OBJ_SanitizedOriginalName.
+# The type is generic (OBJ) because it cannot be auto-detected for rename.
+# Dots (.) in the original name will be PRESERVED in the SanitizedOriginalName.
 # Other special characters (slashes, spaces, hyphens) will be replaced with underscores.`;
 
 
   const createPlaceholder =
-`# Paste one value per line. Example value types:
-# Auto-detect: 192.168.1.10 (becomes Host) or 10.10.0.0/16 (becomes Subnet)
+`# Paste one value per line. The type will be auto-detected. Examples:
 # Host (HST): 192.168.1.10
 # Subnet (SBN): 10.10.0.0/16
 # Address Range (ADR): 172.16.1.5-172.16.1.20
 # FQDN: www.example.com
 #
-# Dots (.) in the value (e.g., in IPs or FQDNs) are preserved in the name suffix.
+# Dots (.) in the value are preserved in the name suffix.
 # Other special characters (slashes, spaces, hyphens) become underscores.
-# New name: ZoneName_Type_SanitizedValue
+# New name: ZoneName_DetectedType_SanitizedValue
 
 1.1.1.1
 10.20.0.0/24
-main.example.com`;
+main.example.com
+192.168.10.10-192.168.10.20`;
 
   const getPlaceholder = () => {
     if (operationType === 'rename') {
@@ -310,34 +308,17 @@ main.example.com`;
   };
 
   const liveZoneNamePart = (baseName.trim() || "[ZoneName]").toUpperCase();
-  let liveTypePart = addressType.toUpperCase();
+  let liveTypePart = 'HST'; // Default example to HST
   let exampleInputForSuffixHint = "";
   let liveExampleSuffix = "";
 
   if (operationType === 'create') {
-    switch (addressType) {
-      case 'AUTO':
-        liveTypePart = 'HST'; // Default example to HST for auto
-        exampleInputForSuffixHint = "192.168.1.1";
-        break;
-      case 'HST':
-        exampleInputForSuffixHint = "192.168.1.1";
-        break;
-      case 'SBN':
-        exampleInputForSuffixHint = "10.0.0.0/16";
-        break;
-      case 'ADR':
-        exampleInputForSuffixHint = "1.1.1.5-1.1.1.10";
-        break;
-      case 'FQDN':
-        exampleInputForSuffixHint = "site.example.com";
-        break;
-      default:
-        exampleInputForSuffixHint = "example-value";
-    }
+    exampleInputForSuffixHint = "192.168.1.1";
+    liveTypePart = 'HST';
     liveExampleSuffix = sanitizeExampleSuffix(exampleInputForSuffixHint);
   } else { // rename
     exampleInputForSuffixHint = "Original.Name-Example";
+    liveTypePart = 'OBJ';
     liveExampleSuffix = sanitizeExampleSuffix(exampleInputForSuffixHint);
   }
   if (!liveExampleSuffix && exampleInputForSuffixHint) liveExampleSuffix = "[SANITIZED]";
@@ -419,19 +400,11 @@ main.example.com`;
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
-                <Label htmlFor="addressType" className="font-semibold text-card-foreground/90">Type</Label>
-                <Select value={addressType} onValueChange={setAddressType}>
-                  <SelectTrigger id="addressType" className="w-full focus:ring-ring">
-                    <SelectValue placeholder="Select type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="AUTO">Auto-detect (Host/Subnet)</SelectItem>
-                    <SelectItem value="HST">Host (HST)</SelectItem>
-                    <SelectItem value="SBN">Subnet (SBN)</SelectItem>
-                    <SelectItem value="ADR">Address Range (ADR)</SelectItem>
-                    <SelectItem value="FQDN">FQDN</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Label className="font-semibold text-card-foreground/90">Type</Label>
+                <div className="flex items-center h-10 w-full rounded-md border border-input bg-muted/50 px-3 py-2 text-sm">
+                    <Wand2 className="h-4 w-4 mr-2 text-muted-foreground" />
+                    <span className="text-muted-foreground font-medium">Auto-Detect</span>
+                </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="descriptionValue" className="font-semibold text-card-foreground/90">
@@ -452,7 +425,7 @@ main.example.com`;
               Example: <strong className="text-card-foreground/90 font-code">{liveExampleName}</strong>
             </p>
             <p className="text-xs text-muted-foreground italic">
-              (Using "{exampleInputForSuffixHint}" as an example {operationType === 'create' ? 'input value' : 'original name'} for the suffix part)
+              (Using "{exampleInputForSuffixHint}" as an example {operationType === 'create' ? 'input value, type is auto-detected' : 'original name, type is generic "OBJ"'})
             </p>
           </div>
 
