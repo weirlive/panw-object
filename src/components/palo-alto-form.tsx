@@ -19,7 +19,7 @@ export default function PaloAltoForm() {
   const [baseName, setBaseName] = useState<string>('');
   const [tagValue, setTagValue] = useState<string>('');
   const [createTagForEntries, setCreateTagForEntries] = useState<boolean>(false);
-  const [addressType, setAddressType] = useState<string>('HST');
+  const [addressType, setAddressType] = useState<string>('AUTO');
   const [descriptionValue, setDescriptionValue] = useState<string>('');
   const [operationType, setOperationType] = useState<OperationType>('create');
   const [listInput, setListInput] = useState<string>('');
@@ -89,6 +89,25 @@ export default function PaloAltoForm() {
       let descriptionForNewEntry: string;
       let originalNameForRename: string | undefined = undefined;
       let newName: string;
+      let currentAddressType = addressType;
+
+      if (operationType === 'create' && addressType === 'AUTO') {
+        if (trimmedLine.includes('/')) {
+          currentAddressType = 'SBN';
+        } else {
+          // Basic check if it looks like an IP, can be improved.
+          // This regex is a simple check and might not cover all edge cases.
+          const ipRegex = /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/;
+          if(ipRegex.test(trimmedLine)) {
+            currentAddressType = 'HST';
+          } else {
+             // If it's not a subnet and doesn't look like a plain IP, maybe it's an FQDN or range?
+             // For now, let's treat it as a skip, or you could default to FQDN
+             commandsArray.push(`# Skipping auto-detect for value: "${trimmedLine}". Not a clear Host/Subnet. Please select a specific type.`);
+             return;
+          }
+        }
+      }
 
 
       if (operationType === 'rename') {
@@ -111,7 +130,7 @@ export default function PaloAltoForm() {
           commandsArray.push(`# Skipping RENAME: Resulting name part is empty after sanitization for original: ${trimmedLine}`);
           return;
         }
-        newName = `${baseName.trim()}_${addressType}_${sanitizedSuffixForRename}`;
+        newName = `${baseName.trim()}_${currentAddressType}_${sanitizedSuffixForRename}`;
         descriptionForNewEntry = descriptionValue.trim() || originalNameForRename;
 
       } else { // Create operation
@@ -134,7 +153,7 @@ export default function PaloAltoForm() {
           commandsArray.push(`# Skipping CREATE: Resulting name part is empty after sanitization: ${trimmedLine} (derived from: ${valuePartForNewNameConstruction})`);
           return;
         }
-        newName = `${baseName.trim()}_${addressType}_${formattedValuePart}`;
+        newName = `${baseName.trim()}_${currentAddressType}_${formattedValuePart}`;
         descriptionForNewEntry = descriptionValue.trim() || trimmedLine;
       }
 
@@ -156,7 +175,7 @@ export default function PaloAltoForm() {
         }
         namesForGroup.push(newName);
       } else { // create
-        switch (addressType) {
+        switch (currentAddressType) {
           case 'HST':
             const hostIp = valuePartForDefinition.includes('/') ? valuePartForDefinition : `${valuePartForDefinition}/32`;
             commandsArray.push(`set address ${newName} ip-netmask ${hostIp}`);
@@ -258,6 +277,7 @@ const renamePlaceholderBase =
 
   const createPlaceholder =
 `# Paste one value per line. Example value types:
+# Auto-detect: 192.168.1.10 (becomes Host) or 10.10.0.0/16 (becomes Subnet)
 # Host (HST): 192.168.1.10
 # Subnet (SBN): 10.10.0.0/16
 # Address Range (ADR): 172.16.1.5-172.16.1.20
@@ -290,12 +310,16 @@ main.example.com`;
   };
 
   const liveZoneNamePart = (baseName.trim() || "[ZoneName]").toUpperCase();
-  const liveTypePart = addressType.toUpperCase();
+  let liveTypePart = addressType.toUpperCase();
   let exampleInputForSuffixHint = "";
   let liveExampleSuffix = "";
 
   if (operationType === 'create') {
     switch (addressType) {
+      case 'AUTO':
+        liveTypePart = 'HST'; // Default example to HST for auto
+        exampleInputForSuffixHint = "192.168.1.1";
+        break;
       case 'HST':
         exampleInputForSuffixHint = "192.168.1.1";
         break;
@@ -401,6 +425,7 @@ main.example.com`;
                     <SelectValue placeholder="Select type" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="AUTO">Auto-detect (Host/Subnet)</SelectItem>
                     <SelectItem value="HST">Host (HST)</SelectItem>
                     <SelectItem value="SBN">Subnet (SBN)</SelectItem>
                     <SelectItem value="ADR">Address Range (ADR)</SelectItem>
@@ -562,3 +587,5 @@ main.example.com`;
     </Card>
   );
 }
+
+    
