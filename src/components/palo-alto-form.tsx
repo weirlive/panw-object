@@ -100,9 +100,7 @@ export default function PaloAltoForm() {
         } else {
             currentAddressType = 'FQDN'; // Default for non-IP/Subnet/Range
         }
-      } else { // For rename, we can't detect type, so we let the user know.
-          // For simplicity, we'll use a generic placeholder or ask user for type in future.
-          // For now, let's use a generic 'OBJ' for rename operations.
+      } else { // For rename, we can't detect type.
           currentAddressType = 'OBJ';
       }
 
@@ -139,11 +137,20 @@ export default function PaloAltoForm() {
              return;
         }
 
-        const formattedValuePart = valuePartForNewNameConstruction
-          .replace(/[\/\s-]+/g, '_') 
-          .replace(/[^a-zA-Z0-9_.]/g, '')
-          .replace(/_{2,}/g, '_') 
-          .replace(/^_+|_+$/g, '');
+        let formattedValuePart;
+        if (currentAddressType === 'ADR') {
+             formattedValuePart = valuePartForNewNameConstruction
+                .replace(/[\/\s]/g, '_') // For ADR, only replace slashes and spaces
+                .replace(/[^a-zA-Z0-9_.-]/g, '') // Allow hyphens
+                .replace(/_{2,}/g, '_')
+                .replace(/^_+|_+$/g, '');
+        } else {
+             formattedValuePart = valuePartForNewNameConstruction
+                .replace(/[\/\s-]+/g, '_') // For others, replace hyphens too
+                .replace(/[^a-zA-Z0-9_.]/g, '')
+                .replace(/_{2,}/g, '_')
+                .replace(/^_+|_+$/g, '');
+        }
 
 
         if (!formattedValuePart) {
@@ -280,8 +287,8 @@ const renamePlaceholderBase =
 # Address Range (ADR): 172.16.1.5-172.16.1.20
 # FQDN: www.example.com
 #
-# Dots (.) in the value are preserved in the name suffix.
-# Other special characters (slashes, spaces, hyphens) become underscores.
+# Dots (.) and hyphens (-) in the value are preserved in the name suffix.
+# Other special characters (slashes, spaces) become underscores.
 # New name: ZoneName_DetectedType_SanitizedValue
 
 1.1.1.1
@@ -298,28 +305,36 @@ main.example.com
 
   const displaySanitizedSuffix = addressGroupSuffix.trim().replace(/[.\/\s]+/g, '_').replace(/[^a-zA-Z0-9_-]/g, '');
 
-  const sanitizeExampleSuffix = (input: string) => {
-    return input
-      .replace(/[\/\s-]+/g, '_') 
-      .replace(/[^a-zA-Z0-9_.]/g, '') 
-      .replace(/_{2,}/g, '_') 
-      .replace(/^_+|_+$/g, '') 
-      .toUpperCase();
+  const sanitizeExampleSuffix = (input: string, type: string) => {
+    let sanitized;
+    if (type === 'ADR') {
+        sanitized = input
+            .replace(/[\/\s]/g, '_')
+            .replace(/[^a-zA-Z0-9_.-]/g, '');
+    } else {
+        sanitized = input
+            .replace(/[\/\s-]+/g, '_')
+            .replace(/[^a-zA-Z0-9_.]/g, '');
+    }
+    return sanitized
+        .replace(/_{2,}/g, '_')
+        .replace(/^_+|_+$/g, '')
+        .toUpperCase();
   };
 
   const liveZoneNamePart = (baseName.trim() || "[ZoneName]").toUpperCase();
-  let liveTypePart = 'HST'; // Default example to HST
+  let liveTypePart = 'HST'; 
   let exampleInputForSuffixHint = "";
   let liveExampleSuffix = "";
 
   if (operationType === 'create') {
-    exampleInputForSuffixHint = "192.168.1.1";
-    liveTypePart = 'HST';
-    liveExampleSuffix = sanitizeExampleSuffix(exampleInputForSuffixHint);
+      exampleInputForSuffixHint = "192.168.1.10-192.168.1.20";
+      liveTypePart = 'ADR';
+      liveExampleSuffix = sanitizeExampleSuffix(exampleInputForSuffixHint, liveTypePart);
   } else { // rename
     exampleInputForSuffixHint = "Original.Name-Example";
     liveTypePart = 'OBJ';
-    liveExampleSuffix = sanitizeExampleSuffix(exampleInputForSuffixHint);
+    liveExampleSuffix = sanitizeExampleSuffix(exampleInputForSuffixHint, liveTypePart);
   }
   if (!liveExampleSuffix && exampleInputForSuffixHint) liveExampleSuffix = "[SANITIZED]";
 
@@ -560,5 +575,3 @@ main.example.com
     </Card>
   );
 }
-
-    
