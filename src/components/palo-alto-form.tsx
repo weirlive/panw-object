@@ -9,10 +9,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ClipboardCopy, ClipboardCheck, TerminalSquare, Settings2, FileSignature, FilePlus, ListPlus, Wand2 } from 'lucide-react';
+import { ClipboardCopy, ClipboardCheck, TerminalSquare, Settings2, FileSignature, FilePlus, ListPlus, Wand2, Trash2 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 
-type OperationType = 'create' | 'rename';
+type OperationType = 'create' | 'rename' | 'delete';
 type AddressType = 'HST' | 'SBN' | 'ADR' | 'FQDN' | 'OBJ';
 
 export default function PaloAltoForm() {
@@ -33,10 +33,10 @@ export default function PaloAltoForm() {
 
   const sanitizeForObjectName = (input: string): string => {
     return input
-      .replace(/[\/\s.-]+/g, '_') // Replace separators with a single underscore
-      .replace(/[^a-zA-Z0-9_]/g, '') // Remove any remaining invalid characters
-      .replace(/_{2,}/g, '_') // Collapse multiple underscores
-      .replace(/^_+|_+$/g, ''); // Trim leading/trailing underscores
+      .replace(/[\/\s.-]+/g, '_') 
+      .replace(/[^a-zA-Z0-9_]/g, '') 
+      .replace(/_{2,}/g, '_') 
+      .replace(/^_+|_+$/g, ''); 
   };
 
   const handleGenerateCommands = (event: FormEvent) => {
@@ -44,7 +44,7 @@ export default function PaloAltoForm() {
     setIsLoading(true);
     setGeneratedCommands('');
 
-    if (!baseName.trim()) {
+    if (operationType !== 'delete' && !baseName.trim()) {
         toast({
             title: "Missing Zone Name",
             description: "Please enter the Zone Name.",
@@ -67,23 +67,26 @@ export default function PaloAltoForm() {
     const namesForGroup: string[] = [];
     const tagsToCreate = new Set<string>();
     
-    const effectiveTag = tagValue.trim() || baseName.trim();
-    const effectiveGroupTag = addressGroupTag.trim() || baseName.trim();
+    if (operationType === 'create') {
+        const effectiveTag = tagValue.trim() || baseName.trim();
+        const effectiveGroupTag = addressGroupTag.trim() || baseName.trim();
 
-    if (tagValue.trim() && createTagForEntries) {
-      tagsToCreate.add(tagValue.trim());
-    }
-    if (addToGroup && addressGroupTag.trim() && createTagForGroup) {
-      tagsToCreate.add(addressGroupTag.trim());
+        if (tagValue.trim() && createTagForEntries) {
+          tagsToCreate.add(tagValue.trim());
+        }
+        if (addToGroup && addressGroupTag.trim() && createTagForGroup) {
+          tagsToCreate.add(addressGroupTag.trim());
+        }
+
+        if (tagsToCreate.size > 0) {
+          commandsArray.push(`# Tag Creation Commands`);
+          tagsToCreate.forEach(tag => {
+            commandsArray.push(`set tag ${tag}`);
+          });
+          commandsArray.push(``); 
+        }
     }
 
-    if (tagsToCreate.size > 0) {
-      commandsArray.push(`# Tag Creation Commands`);
-      tagsToCreate.forEach(tag => {
-        commandsArray.push(`set tag ${tag}`);
-      });
-      commandsArray.push(``); 
-    }
 
     const lines = listInput.split('\n');
     const ipRegex = /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/;
@@ -92,6 +95,11 @@ export default function PaloAltoForm() {
       const trimmedLine = line.trim();
       if (!trimmedLine) return;
 
+      if (operationType === 'delete') {
+          commandsArray.push(`delete address ${trimmedLine}`);
+          return;
+      }
+      
       let currentAddressType: AddressType;
       let valueForDefinition: string = trimmedLine;
       let descriptionForNewEntry: string;
@@ -105,10 +113,10 @@ export default function PaloAltoForm() {
         if (trimmedLine.endsWith('/32')) {
           currentAddressType = 'HST';
           valueForDefinition = trimmedLine.replace(/\/32$/, '');
-        } else if (trimmedLine.includes('-')) {
-            currentAddressType = 'ADR';
         } else if (trimmedLine.includes('/')) {
             currentAddressType = 'SBN';
+        } else if (trimmedLine.includes('-')) {
+            currentAddressType = 'ADR';
         } else if (ipRegex.test(trimmedLine)) {
             currentAddressType = 'HST';
         } else {
@@ -122,19 +130,21 @@ export default function PaloAltoForm() {
           commandsArray.push(`# SKIPPING: Could not generate a valid name from input: "${trimmedLine}"`);
           return;
       }
-
+      
       newName = `${baseName.trim()}_${currentAddressType}_${sanitizedSuffix}`.toUpperCase();
       descriptionForNewEntry = descriptionValue.trim() || trimmedLine;
 
       if (operationType === 'rename') {
         commandsArray.push(`rename address ${originalNameForRename} to ${newName}`);
-        commandsArray.push(`set address ${newName} description "${descriptionForNewEntry}"`);
-        if (effectiveTag) {
-            commandsArray.push(`set address ${newName} tag [ ${effectiveTag} ]\n`);
-        } else {
-            commandsArray.push(''); 
+        if(descriptionValue.trim()) {
+            commandsArray.push(`set address ${newName} description "${descriptionForNewEntry}"`);
         }
+        if (tagValue.trim()) {
+            commandsArray.push(`set address ${newName} tag [ ${tagValue.trim()} ]`);
+        }
+        commandsArray.push('');
         namesForGroup.push(newName);
+
       } else { // create
         switch (currentAddressType) {
           case 'HST':
@@ -151,6 +161,7 @@ export default function PaloAltoForm() {
             break;
         }
         commandsArray.push(`set address ${newName} description "${descriptionForNewEntry}"`);
+        const effectiveTag = tagValue.trim() || baseName.trim();
         if (effectiveTag) {
             commandsArray.push(`set address ${newName} tag [ ${effectiveTag} ]\n`);
         } else {
@@ -160,10 +171,11 @@ export default function PaloAltoForm() {
       }
     });
 
-    if (addToGroup && namesForGroup.length > 0) {
+    if (operationType === 'create' && addToGroup && namesForGroup.length > 0) {
       const sanitizedGroupSuffix = addressGroupSuffix.trim().replace(/[\/\s]+/g, '_').replace(/[^a-zA-Z0-9_-]/g, '');
       const groupNameBase = `${baseName.trim()}_ADG_`;
       const groupName = `${groupNameBase}${sanitizedGroupSuffix ? sanitizedGroupSuffix : ''}`.toUpperCase();
+      const effectiveGroupTag = addressGroupTag.trim() || baseName.trim();
       
       commandsArray.push(`\n# Address Group Configuration`);
       commandsArray.push(`set address-group ${groupName} static [ ${namesForGroup.join(' ')} ]`);
@@ -183,7 +195,7 @@ export default function PaloAltoForm() {
     if (commandsArray.length > 0 && commandsArray.some(cmd => !cmd.startsWith('#'))) {
         toast({
             title: "Commands Generated",
-            description: `Your CLI commands are ready.${addToGroup && namesForGroup.length > 0 ? ' Address group configured.' : ''}`,
+            description: `Your CLI commands are ready.`,
         });
     } else if (commandsArray.every(cmd => cmd.startsWith('#')) && commandsArray.length > 0) {
         toast({
@@ -233,8 +245,7 @@ const renamePlaceholder =
 # The new name will be constructed as:
 # ZoneName_OBJ_MyExisting_OBJ_Server`;
 
-
-  const createPlaceholder =
+const createPlaceholder =
 `# Paste one value per line. Type is auto-detected.
 # Host (HST) -> 192.168.1.10 or 192.168.1.10/32
 # Subnet (SBN) -> 10.10.0.0/16
@@ -251,8 +262,22 @@ const renamePlaceholder =
 main.example.com
 192.168.10.10-192.168.10.20`;
 
+const deletePlaceholder = 
+`# Paste one full object name per line to delete.
+# Example: DMZ_HST_1_1_1_1
+# Example: DMZ_SBN_10_0_0_0_24`;
+
   const getPlaceholder = () => {
-    return operationType === 'rename' ? renamePlaceholder : createPlaceholder;
+      switch (operationType) {
+        case 'create':
+          return createPlaceholder;
+        case 'rename':
+          return renamePlaceholder;
+        case 'delete':
+          return deletePlaceholder;
+        default:
+          return '';
+      }
   }
 
   const displaySanitizedSuffix = addressGroupSuffix.trim().replace(/[.\/\s]+/g, '_').replace(/[^a-zA-Z0-9_-]/g, '');
@@ -298,95 +323,116 @@ main.example.com
                 <FileSignature className="mr-2 h-4 w-4 text-primary/80" /> Rename
               </Label>
             </div>
+             <div className="flex items-center space-x-2">
+              <RadioGroupItem value="delete" id="r_delete" />
+              <Label htmlFor="r_delete" className="flex items-center text-sm">
+                <Trash2 className="mr-2 h-4 w-4 text-primary/80" /> Delete
+              </Label>
+            </div>
           </RadioGroup>
         </div>
       </CardHeader>
       <form onSubmit={handleGenerateCommands}>
         <CardContent className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <Label htmlFor="baseName" className="font-semibold text-card-foreground/90">Zone Name</Label>
-              <Input
-                id="baseName"
-                type="text"
-                placeholder="e.g., DMZ-External"
-                value={baseName}
-                onChange={(e) => setBaseName(e.target.value)}
-                required
-                className="focus:ring-ring"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="tagValue" className="font-semibold text-card-foreground/90">Tag (Optional)</Label>
-              <Input
-                id="tagValue"
-                type="text"
-                placeholder="e.g., CriticalServer"
-                value={tagValue}
-                onChange={(e) => setTagValue(e.target.value)}
-                className="focus:ring-ring"
-              />
-              <div className="flex items-center space-x-2 pt-1">
-                <Checkbox 
-                  id="createTagForEntries" 
-                  checked={createTagForEntries} 
-                  onCheckedChange={(checked) => setCreateTagForEntries(checked === true)} 
-                  disabled={!tagValue.trim()}
-                />
-                <Label htmlFor="createTagForEntries" className="text-xs font-normal text-muted-foreground">
-                  Create this tag if it doesn't exist
-                </Label>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-                <Label className="font-semibold text-card-foreground/90">Type</Label>
-                <div className="flex items-center h-10 w-full rounded-md border border-input bg-muted/50 px-3 py-2 text-sm">
-                    <Wand2 className="h-4 w-4 mr-2 text-muted-foreground" />
-                    <span className="text-muted-foreground font-medium">Auto-Detect</span>
+          {operationType !== 'delete' && (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="baseName" className="font-semibold text-card-foreground/90">Zone Name</Label>
+                  <Input
+                    id="baseName"
+                    type="text"
+                    placeholder="e.g., DMZ-External"
+                    value={baseName}
+                    onChange={(e) => setBaseName(e.target.value)}
+                    required
+                    className="focus:ring-ring"
+                  />
                 </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="descriptionValue" className="font-semibold text-card-foreground/90">
-                Description (Optional)
-              </Label>
-              <Input
-                id="descriptionValue"
-                type="text"
-                placeholder="e.g., Primary Web Server"
-                value={descriptionValue}
-                onChange={(e) => setDescriptionValue(e.target.value)}
-                className="focus:ring-ring"
-              />
-            </div>
-          </div>
-           <div className="mt-1 space-y-1 pl-1">
-            <p className="text-xs text-muted-foreground">
-              Example: <strong className="text-card-foreground/90 font-code">{liveExampleName}</strong>
-            </p>
-            <p className="text-xs text-muted-foreground italic">
-              (Using "{exampleInput}" as an example input)
-            </p>
-          </div>
+                <div className="space-y-2">
+                  <Label htmlFor="tagValue" className="font-semibold text-card-foreground/90">Tag (Optional)</Label>
+                  <Input
+                    id="tagValue"
+                    type="text"
+                    placeholder={operationType === 'create' ? "Default: Zone Name" : "No default tag for rename"}
+                    value={tagValue}
+                    onChange={(e) => setTagValue(e.target.value)}
+                    className="focus:ring-ring"
+                  />
+                   {operationType === 'create' && (
+                      <div className="flex items-center space-x-2 pt-1">
+                        <Checkbox 
+                          id="createTagForEntries" 
+                          checked={createTagForEntries} 
+                          onCheckedChange={(checked) => setCreateTagForEntries(checked === true)} 
+                          disabled={!tagValue.trim()}
+                        />
+                        <Label htmlFor="createTagForEntries" className="text-xs font-normal text-muted-foreground">
+                          Create this tag if it doesn't exist
+                        </Label>
+                      </div>
+                    )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {operationType === 'create' ? (
+                  <div className="space-y-2">
+                      <Label className="font-semibold text-card-foreground/90">Type</Label>
+                      <div className="flex items-center h-10 w-full rounded-md border border-input bg-muted/50 px-3 py-2 text-sm">
+                          <Wand2 className="h-4 w-4 mr-2 text-muted-foreground" />
+                          <span className="text-muted-foreground font-medium">Auto-Detect</span>
+                      </div>
+                  </div>
+                ) : (
+                   <div className="space-y-2">
+                      <Label className="font-semibold text-card-foreground/90">Type</Label>
+                      <div className="flex items-center h-10 w-full rounded-md border border-input bg-muted/50 px-3 py-2 text-sm">
+                           <span className="text-muted-foreground font-medium">Object</span>
+                      </div>
+                  </div>
+                )}
+                <div className="space-y-2">
+                  <Label htmlFor="descriptionValue" className="font-semibold text-card-foreground/90">
+                    Description (Optional)
+                  </Label>
+                  <Input
+                    id="descriptionValue"
+                    type="text"
+                    placeholder={operationType === 'create' ? "Default: Pasted value" : "Enter description"}
+                    value={descriptionValue}
+                    onChange={(e) => setDescriptionValue(e.target.value)}
+                    className="focus:ring-ring"
+                  />
+                </div>
+              </div>
+              <div className="mt-1 space-y-1 pl-1">
+                <p className="text-xs text-muted-foreground">
+                  Example: <strong className="text-card-foreground/90 font-code">{liveExampleName}</strong>
+                </p>
+                <p className="text-xs text-muted-foreground italic">
+                  (Using "{exampleInput}" as an example input)
+                </p>
+              </div>
 
 
-          <div className="space-y-2 pt-4">
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="addToGroup"
-                checked={addToGroup}
-                onCheckedChange={(checked: boolean | 'indeterminate') => setAddToGroup(checked === true)}
-              />
-              <Label htmlFor="addToGroup" className="font-semibold text-card-foreground/90 flex items-center">
-                <ListPlus className="mr-2 h-5 w-5 text-primary/80" />
-                Add to an Address Group
-              </Label>
-            </div>
-          </div>
+              <div className="space-y-2 pt-4">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="addToGroup"
+                    checked={addToGroup}
+                    onCheckedChange={(checked: boolean | 'indeterminate') => setAddToGroup(checked === true)}
+                  />
+                  <Label htmlFor="addToGroup" className="font-semibold text-card-foreground/90 flex items-center">
+                    <ListPlus className="mr-2 h-5 w-5 text-primary/80" />
+                    Add to an Address Group
+                  </Label>
+                </div>
+              </div>
+            </>
+          )}
 
-          {addToGroup && (
+          {operationType !== 'delete' && addToGroup && (
             <div className="space-y-4 pl-7">
               <div className="space-y-2">
                 <Label htmlFor="addressGroupSuffix" className="font-semibold text-card-foreground/90">
@@ -411,7 +457,7 @@ main.example.com
                 <Input
                   id="addressGroupTag"
                   type="text"
-                  placeholder="e.g., DepartmentTag"
+                  placeholder="Default: Zone Name"
                   value={addressGroupTag}
                   onChange={(e) => setAddressGroupTag(e.target.value)}
                   className="focus:ring-ring"
@@ -434,8 +480,10 @@ main.example.com
           <div className="space-y-2">
             <Label htmlFor="listInput" className="font-semibold text-card-foreground/90">
               {operationType === 'rename'
-                ? 'List (Original Name, one per line)'
-                : 'Values (One value per line)'
+                ? 'Original Names (One per line)'
+                : operationType === 'delete' 
+                ? 'Object Names to Delete (One per line)'
+                : 'Values (One per line)'
               }
             </Label>
             <Textarea
