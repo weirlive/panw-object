@@ -102,7 +102,10 @@ export default function PaloAltoForm() {
         currentAddressType = 'OBJ';
         originalNameForRename = trimmedLine;
       } else { // 'create' operation: auto-detect type
-        if (trimmedLine.includes('-')) {
+        if (trimmedLine.endsWith('/32')) {
+          currentAddressType = 'HST';
+          valueForDefinition = trimmedLine.replace(/\/32$/, '');
+        } else if (trimmedLine.includes('-')) {
             currentAddressType = 'ADR';
         } else if (trimmedLine.includes('/')) {
             currentAddressType = 'SBN';
@@ -233,7 +236,7 @@ const renamePlaceholder =
 
   const createPlaceholder =
 `# Paste one value per line. Type is auto-detected.
-# Host (HST) -> 192.168.1.10
+# Host (HST) -> 192.168.1.10 or 192.168.1.10/32
 # Subnet (SBN) -> 10.10.0.0/16
 # Range (ADR) -> 172.16.1.5-172.16.1.20
 # FQDN (FQDN) -> www.example.com
@@ -243,6 +246,7 @@ const renamePlaceholder =
 # value will be replaced with underscores for the name.
 
 1.1.1.1
+1.1.1.2/32
 10.20.0.0/24
 main.example.com
 192.168.10.10-192.168.10.20`;
@@ -498,6 +502,5 @@ main.example.com
     </Card>
   );
 }
-
 
     
