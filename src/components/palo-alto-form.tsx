@@ -13,6 +13,7 @@ import { ClipboardCopy, ClipboardCheck, TerminalSquare, Settings2, FileSignature
 import { useToast } from "@/hooks/use-toast";
 
 type OperationType = 'create' | 'rename';
+type AddressType = 'HST' | 'SBN' | 'ADR' | 'FQDN' | 'OBJ';
 
 export default function PaloAltoForm() {
   const [baseName, setBaseName] = useState<string>('');
@@ -29,6 +30,14 @@ export default function PaloAltoForm() {
   const [addressGroupTag, setAddressGroupTag] = useState<string>('');
   const [createTagForGroup, setCreateTagForGroup] = useState<boolean>(false);
   const { toast } = useToast();
+
+  const sanitizeForObjectName = (input: string): string => {
+    return input
+      .replace(/[\/\s.-]+/g, '_') // Replace separators with a single underscore
+      .replace(/[^a-zA-Z0-9_]/g, '') // Remove any remaining invalid characters
+      .replace(/_{2,}/g, '_') // Collapse multiple underscores
+      .replace(/^_+|_+$/g, ''); // Trim leading/trailing underscores
+  };
 
   const handleGenerateCommands = (event: FormEvent) => {
     event.preventDefault();
@@ -83,14 +92,16 @@ export default function PaloAltoForm() {
       const trimmedLine = line.trim();
       if (!trimmedLine) return;
 
-      let valuePartForNewNameConstruction: string;
-      let valuePartForDefinition: string = '';
+      let currentAddressType: AddressType;
+      let valueForDefinition: string = trimmedLine;
       let descriptionForNewEntry: string;
       let originalNameForRename: string | undefined = undefined;
       let newName: string;
-      let currentAddressType: string = 'FQDN'; // Default for create
 
-      if (operationType === 'create') {
+      if (operationType === 'rename') {
+        currentAddressType = 'OBJ';
+        originalNameForRename = trimmedLine;
+      } else { // 'create' operation: auto-detect type
         if (trimmedLine.includes('-')) {
             currentAddressType = 'ADR';
         } else if (trimmedLine.includes('/')) {
@@ -98,78 +109,21 @@ export default function PaloAltoForm() {
         } else if (ipRegex.test(trimmedLine)) {
             currentAddressType = 'HST';
         } else {
-            currentAddressType = 'FQDN'; // Default for non-IP/Subnet/Range
+            currentAddressType = 'FQDN';
         }
-      } else { // For rename, we can't detect type.
-          currentAddressType = 'OBJ';
       }
 
+      const sanitizedSuffix = sanitizeForObjectName(trimmedLine);
 
-      if (operationType === 'rename') {
-        originalNameForRename = trimmedLine;
-        valuePartForNewNameConstruction = trimmedLine;
-
-        if (!originalNameForRename.trim()) {
-          commandsArray.push(`# Skipping RENAME: Empty original name provided: ${trimmedLine}`);
+      if (!sanitizedSuffix) {
+          commandsArray.push(`# SKIPPING: Could not generate a valid name from input: "${trimmedLine}"`);
           return;
-        }
-        
-        const sanitizedSuffixForRename = valuePartForNewNameConstruction
-          .replace(/[\/\s-]+/g, '_') 
-          .replace(/[^a-zA-Z0-9_.]/g, '') 
-          .replace(/_{2,}/g, '_') 
-          .replace(/^_+|_+$/g, '');
-
-
-        if (!sanitizedSuffixForRename) {
-          commandsArray.push(`# Skipping RENAME: Resulting name part is empty after sanitization for original: ${trimmedLine}`);
-          return;
-        }
-        newName = `${baseName.trim()}_${currentAddressType}_${sanitizedSuffixForRename}`;
-        descriptionForNewEntry = descriptionValue.trim() || originalNameForRename;
-
-      } else { // Create operation
-        valuePartForNewNameConstruction = trimmedLine;
-        valuePartForDefinition = trimmedLine;
-
-        if (!valuePartForDefinition.trim()) {
-             commandsArray.push(`# Skipping CREATE: Empty value provided: ${trimmedLine}`);
-             return;
-        }
-
-        let formattedValuePart;
-        if (currentAddressType === 'ADR') {
-             formattedValuePart = valuePartForNewNameConstruction
-                .replace(/[\/\s]/g, '_') // For ADR, only replace slashes and spaces
-                .replace(/[^a-zA-Z0-9_.-]/g, '') // Allow hyphens
-                .replace(/_{2,}/g, '_')
-                .replace(/^_+|_+$/g, '');
-        } else {
-             formattedValuePart = valuePartForNewNameConstruction
-                .replace(/[\/\s-]+/g, '_') // For others, replace hyphens too
-                .replace(/[^a-zA-Z0-9_.]/g, '')
-                .replace(/_{2,}/g, '_')
-                .replace(/^_+|_+$/g, '');
-        }
-
-
-        if (!formattedValuePart) {
-          commandsArray.push(`# Skipping CREATE: Resulting name part is empty after sanitization: ${trimmedLine} (derived from: ${valuePartForNewNameConstruction})`);
-          return;
-        }
-        newName = `${baseName.trim()}_${currentAddressType}_${formattedValuePart}`;
-        descriptionForNewEntry = descriptionValue.trim() || trimmedLine;
       }
 
-
-      newName = newName.toUpperCase();
-
+      newName = `${baseName.trim()}_${currentAddressType}_${sanitizedSuffix}`.toUpperCase();
+      descriptionForNewEntry = descriptionValue.trim() || trimmedLine;
 
       if (operationType === 'rename') {
-        if (!originalNameForRename) {
-             commandsArray.push(`# Skipping RENAME: Could not determine original name for: ${trimmedLine}`);
-             return;
-        }
         commandsArray.push(`rename address ${originalNameForRename} to ${newName}`);
         commandsArray.push(`set address ${newName} description "${descriptionForNewEntry}"`);
         if (effectiveTag) {
@@ -181,17 +135,16 @@ export default function PaloAltoForm() {
       } else { // create
         switch (currentAddressType) {
           case 'HST':
-            const hostIp = valuePartForDefinition.includes('/') ? valuePartForDefinition : `${valuePartForDefinition}/32`;
-            commandsArray.push(`set address ${newName} ip-netmask ${hostIp}`);
+            commandsArray.push(`set address ${newName} ip-netmask ${valueForDefinition}/32`);
             break;
           case 'SBN':
-            commandsArray.push(`set address ${newName} ip-netmask ${valuePartForDefinition}`);
+            commandsArray.push(`set address ${newName} ip-netmask ${valueForDefinition}`);
             break;
           case 'ADR':
-            commandsArray.push(`set address ${newName} ip-range ${valuePartForDefinition}`);
+            commandsArray.push(`set address ${newName} ip-range ${valueForDefinition}`);
             break;
           case 'FQDN':
-            commandsArray.push(`set address ${newName} fqdn ${valuePartForDefinition}`);
+            commandsArray.push(`set address ${newName} fqdn ${valueForDefinition}`);
             break;
         }
         commandsArray.push(`set address ${newName} description "${descriptionForNewEntry}"`);
@@ -271,25 +224,23 @@ export default function PaloAltoForm() {
     }
   };
 
-const renamePlaceholderBase =
-`# Paste one original name per line.
-# Example: MyExistingServer.internal.net
-# The new name will be constructed as: ZoneName_OBJ_SanitizedOriginalName.
-# The type is generic (OBJ) because it cannot be auto-detected for rename.
-# Dots (.) in the original name will be PRESERVED in the SanitizedOriginalName.
-# Other special characters (slashes, spaces, hyphens) will be replaced with underscores.`;
+const renamePlaceholder =
+`# Paste one original object name per line.
+# Example: MyExisting_OBJ_Server
+# The new name will be constructed as:
+# ZoneName_OBJ_MyExisting_OBJ_Server`;
 
 
   const createPlaceholder =
-`# Paste one value per line. The type will be auto-detected. Examples:
-# Host (HST): 192.168.1.10
-# Subnet (SBN): 10.10.0.0/16
-# Address Range (ADR): 172.16.1.5-172.16.1.20
-# FQDN: www.example.com
+`# Paste one value per line. Type is auto-detected.
+# Host (HST) -> 192.168.1.10
+# Subnet (SBN) -> 10.10.0.0/16
+# Range (ADR) -> 172.16.1.5-172.16.1.20
+# FQDN (FQDN) -> www.example.com
 #
-# Dots (.) and hyphens (-) in the value are preserved in the name suffix.
-# Other special characters (slashes, spaces) become underscores.
-# New name: ZoneName_DetectedType_SanitizedValue
+# Name format: ZoneName_DetectedType_SanitizedValue
+# All special characters (dots, hyphens, etc.) in the
+# value will be replaced with underscores for the name.
 
 1.1.1.1
 10.20.0.0/24
@@ -297,50 +248,22 @@ main.example.com
 192.168.10.10-192.168.10.20`;
 
   const getPlaceholder = () => {
-    if (operationType === 'rename') {
-      return renamePlaceholderBase;
-    }
-    return createPlaceholder;
+    return operationType === 'rename' ? renamePlaceholder : createPlaceholder;
   }
 
   const displaySanitizedSuffix = addressGroupSuffix.trim().replace(/[.\/\s]+/g, '_').replace(/[^a-zA-Z0-9_-]/g, '');
 
-  const sanitizeExampleSuffix = (input: string, type: string) => {
-    let sanitized;
-    if (type === 'ADR') {
-        sanitized = input
-            .replace(/[\/\s]/g, '_')
-            .replace(/[^a-zA-Z0-9_.-]/g, '');
-    } else {
-        sanitized = input
-            .replace(/[\/\s-]+/g, '_')
-            .replace(/[^a-zA-Z0-9_.]/g, '');
-    }
-    return sanitized
-        .replace(/_{2,}/g, '_')
-        .replace(/^_+|_+$/g, '')
-        .toUpperCase();
-  };
-
   const liveZoneNamePart = (baseName.trim() || "[ZoneName]").toUpperCase();
-  let liveTypePart = 'HST'; 
-  let exampleInputForSuffixHint = "";
-  let liveExampleSuffix = "";
-
-  if (operationType === 'create') {
-      exampleInputForSuffixHint = "192.168.1.10-192.168.1.20";
-      liveTypePart = 'ADR';
-      liveExampleSuffix = sanitizeExampleSuffix(exampleInputForSuffixHint, liveTypePart);
-  } else { // rename
-    exampleInputForSuffixHint = "Original.Name-Example";
+  let exampleInput = "www.example.com";
+  let liveTypePart: AddressType = 'FQDN';
+  
+  if (operationType === 'rename') {
+    exampleInput = "Original.Name-Example";
     liveTypePart = 'OBJ';
-    liveExampleSuffix = sanitizeExampleSuffix(exampleInputForSuffixHint, liveTypePart);
   }
-  if (!liveExampleSuffix && exampleInputForSuffixHint) liveExampleSuffix = "[SANITIZED]";
 
-
+  const liveExampleSuffix = sanitizeForObjectName(exampleInput).toUpperCase();
   const liveExampleName = `${liveZoneNamePart}_${liveTypePart}_${liveExampleSuffix || "[Suffix]"}`;
-  const lines = listInput.split('\n');
 
 
   return (
@@ -440,7 +363,7 @@ main.example.com
               Example: <strong className="text-card-foreground/90 font-code">{liveExampleName}</strong>
             </p>
             <p className="text-xs text-muted-foreground italic">
-              (Using "{exampleInputForSuffixHint}" as an example {operationType === 'create' ? 'input value, type is auto-detected' : 'original name, type is generic "OBJ"'})
+              (Using "{exampleInput}" as an example input)
             </p>
           </div>
 
@@ -575,3 +498,6 @@ main.example.com
     </Card>
   );
 }
+
+
+    
