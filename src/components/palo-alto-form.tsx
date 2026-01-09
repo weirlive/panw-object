@@ -492,7 +492,7 @@ const deletePlaceholder =
               value={listInput}
               onChange={(e) => setListInput(e.target.value)}
               required
-              rows={8}
+              rows={14}
               className="focus:ring-ring font-code text-sm"
             />
           </div>
@@ -551,4 +551,5 @@ const deletePlaceholder =
   );
 }
 
+    
     
