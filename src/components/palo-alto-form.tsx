@@ -133,13 +133,14 @@ export default function PaloAltoForm() {
           sanitizedSuffix = trimmedLine.replace(/\/32$/, '');
         } else if (currentAddressType === 'SBN') {
           sanitizedSuffix = trimmedLine.replace('/', '_');
+        } else if (currentAddressType === 'ADR') {
+          sanitizedSuffix = trimmedLine;
         } else {
-          // For ADR and FQDN, use the old logic as the user didn't specify a change.
+          // For FQDN and other types
           sanitizedSuffix = sanitizeForObjectName(trimmedLine);
         }
       }
       
-
       if (!sanitizedSuffix) {
           commandsArray.push(`# SKIPPING: Could not generate a valid name from input: "${trimmedLine}"`);
           return;
@@ -277,7 +278,8 @@ main.example.com
 const deletePlaceholder = 
 `# Paste one full object name per line to delete.
 # Example: DMZ_HST_1.1.1.1
-# Example: DMZ_SBN_10.0.0.0_24`;
+# Example: DMZ_SBN_10.0.0.0_24
+# Example: DMZ_ADR_1.1.1.1-2.2.2.2`;
 
   const getPlaceholder = () => {
       switch (operationType) {
@@ -304,9 +306,9 @@ const deletePlaceholder =
     liveTypePart = 'OBJ';
     liveExampleSuffix = sanitizeForObjectName(exampleInput).toUpperCase();
   } else { // create
-    exampleInput = "10.20.0.0/24";
-    liveTypePart = 'SBN';
-    liveExampleSuffix = exampleInput.replace('/', '_');
+    exampleInput = "1.1.1.1-2.2.2.2";
+    liveTypePart = 'ADR';
+    liveExampleSuffix = exampleInput;
   }
 
   const liveExampleName = `${liveZoneNamePart}_${liveTypePart}_${liveExampleSuffix || "[Suffix]"}`;
