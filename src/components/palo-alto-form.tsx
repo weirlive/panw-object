@@ -124,7 +124,21 @@ export default function PaloAltoForm() {
         }
       }
 
-      const sanitizedSuffix = sanitizeForObjectName(trimmedLine);
+      let sanitizedSuffix: string;
+
+      if (operationType === 'rename') {
+        sanitizedSuffix = sanitizeForObjectName(trimmedLine);
+      } else {
+        if (currentAddressType === 'HST') {
+          sanitizedSuffix = trimmedLine.replace(/\/32$/, '');
+        } else if (currentAddressType === 'SBN') {
+          sanitizedSuffix = trimmedLine.replace('/', '_');
+        } else {
+          // For ADR and FQDN, use the old logic as the user didn't specify a change.
+          sanitizedSuffix = sanitizeForObjectName(trimmedLine);
+        }
+      }
+      
 
       if (!sanitizedSuffix) {
           commandsArray.push(`# SKIPPING: Could not generate a valid name from input: "${trimmedLine}"`);
@@ -252,9 +266,7 @@ const createPlaceholder =
 # Range (ADR) -> 172.16.1.5-172.16.1.20
 # FQDN (FQDN) -> www.example.com
 #
-# Name format: ZoneName_DetectedType_SanitizedValue
-# All special characters (dots, hyphens, etc.) in the
-# value will be replaced with underscores for the name.
+# Name format: ZoneName_DetectedType_Value
 
 1.1.1.1
 1.1.1.2/32
@@ -264,8 +276,8 @@ main.example.com
 
 const deletePlaceholder = 
 `# Paste one full object name per line to delete.
-# Example: DMZ_HST_1_1_1_1
-# Example: DMZ_SBN_10_0_0_0_24`;
+# Example: DMZ_HST_1.1.1.1
+# Example: DMZ_SBN_10.0.0.0_24`;
 
   const getPlaceholder = () => {
       switch (operationType) {
@@ -283,15 +295,20 @@ const deletePlaceholder =
   const displaySanitizedSuffix = addressGroupSuffix.trim().replace(/[.\/\s]+/g, '_').replace(/[^a-zA-Z0-9_-]/g, '');
 
   const liveZoneNamePart = (baseName.trim() || "[ZoneName]").toUpperCase();
-  let exampleInput = "www.example.com";
-  let liveTypePart: AddressType = 'FQDN';
+  let exampleInput: string;
+  let liveTypePart: AddressType;
+  let liveExampleSuffix: string;
   
   if (operationType === 'rename') {
     exampleInput = "Original.Name-Example";
     liveTypePart = 'OBJ';
+    liveExampleSuffix = sanitizeForObjectName(exampleInput).toUpperCase();
+  } else { // create
+    exampleInput = "10.20.0.0/24";
+    liveTypePart = 'SBN';
+    liveExampleSuffix = exampleInput.replace('/', '_');
   }
 
-  const liveExampleSuffix = sanitizeForObjectName(exampleInput).toUpperCase();
   const liveExampleName = `${liveZoneNamePart}_${liveTypePart}_${liveExampleSuffix || "[Suffix]"}`;
 
 
@@ -550,8 +567,3 @@ const deletePlaceholder =
     </Card>
   );
 }
-
-    
-    
-
-    
